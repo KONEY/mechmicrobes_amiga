@@ -32,12 +32,8 @@ Demo:				;a4=VBR, a6=Custom Registers Base addr
 	MOVE.L	#VBint,$6C(A4)
 	MOVE.W	#%1110000000100000,INTENA
 	;** SOMETHING INSIDE HERE IS NEEDED TO MAKE MOD PLAY! **
-	MOVE.W	#%1000011111100000,DMACON	; BIT10=BLIT NASTY
-	MOVE.W	MODSTART_POS,D3
-	CMP.W	#0,D3
-	BEQ.S	.dontDisableBlitterNasty	; IF START > 0 DISABLE BLIT NASTY NOW
-	MOVE.W	#%0000010000000000,DMACON	; BIT10=BLIT NASTY DISABLED
-	.dontDisableBlitterNasty:
+	;move.w	#%1110000000000000,INTENA	; Master and lev6	; NO COPPER-IRQ!
+	MOVE.W	#%1000011111100000,DMACON
 	;*--- clear screens ---*
 	LEA	SCREEN1,A1
 	BSR.W	ClearScreen
@@ -286,13 +282,13 @@ DRAWL:
 	bpl.s	OK1		; se 4*DY-2*DX>0 salta..
 	or.w	#$0040,d5	; altrimenti setta il bit SIGN
 OK1:
-	move.w	d0,$40(a5)	; BLTCON0
-	move.w	d5,$42(a5)	; BLTCON1
+	move.w	d0,BLTCON0	; BLTCON0
+	move.w	d5,BLTCON1	; BLTCON1
 	sub.w	d2,d3		; D3=4*DY-4*DX
-	move.w	d3,$64(a5)	; BLTAMOD=4*DY-4*DX
-	move.l	a0,$48(a5)	; BLTCPT - indirizzo schermo
-	move.l	a0,$54(a5)	; BLTDPT - indirizzo schermo
-	move.w	d1,$58(a5)	; BLTSIZE
+	move.w	d3,BLTAMOD	; BLTAMOD=4*DY-4*DX
+	move.l	a0,BLTCPTH	; BLTCPT - indirizzo schermo
+	move.l	a0,BLTDPTH	; BLTDPT - indirizzo schermo
+	move.w	d1,BLTSIZE	; BLTSIZE
 	rts
 
 ;******************************************************************************
@@ -311,7 +307,6 @@ InitLine:
 ;******************************************************************************
 ; D0-D1
 ;******************************************************************************
-
 __ROTATE:
 	; Rotate around Z Axis:
 	VarTimesTrig d0,d4,d5	;left = rotatedX * cos
@@ -325,12 +320,11 @@ __ROTATE:
 	move.l	d7,d0		;rotatedX = tmp
 	RTS
 
-;****************************************************************************
 ;********** Fastmem Data **********
 	INCLUDE	"sincosin_table.i"	; VALUES
 
 ANGLE:	DC.W 90
-PXLSIDE:	DC.W 8
+PXLSIDE:	DC.W 16
 
 KONEY:	; ROTATED 90 DEG
 	DC.W 0,0,1,0
@@ -364,23 +358,17 @@ ViewBuffer:	DC.L SCREEN1	; to be swapped
 	SECTION	ChipData,DATA_C	;declared data that must be in chipmem
 
 COPPER:
-	DC.W $1FC,0	; Slow fetch mode, remove if AGA demo.
-	DC.W $8E,$2C81	; 238h display window top, left | DIWSTRT - 11.393
-	DC.W $90,$2CC1	; and bottom, right.	| DIWSTOP - 11.457
-	DC.W $92,$38	; Standard bitplane dma fetch start
-	DC.W $94,$D0	; and stop for standard screen.
+	DC.W $1FC,0	;Slow fetch mode, remove if AGA demo.
+	DC.W $8E,$2C81	;238h display window top, left | DIWSTRT - 11.393
+	DC.W $90,$2CC1	;and bottom, right.	| DIWSTOP - 11.457
+	DC.W $92,$38	;Standard bitplane dma fetch start
+	DC.W $94,$D0	;and stop for standard screen.
 
-	DC.W $106,$0C00	; (AGA compat. if any Dual Playf. mode)
-	
-	DC.W $108	; BPL1MOD	 Bitplane modulo (odd planes)
-	BPL1MOD:
-	DC.W 2		; bwid-bpl	;modulos
-	
-	DC.W $10A	; BPL2MOD Bitplane modulo (even planes)
-	BPL2MOD:
-	DC.W 2		; bwid-bpl	;RISULTATO = 80 ?
-	
-	DC.W $102,0	; SCROLL REGISTER (AND PLAYFIELD PRI)
+	DC.W $106,$0C00	;(AGA compat. if any Dual Playf. mode)
+	DC.W $108,0	;bwid-bpl	;modulos
+	DC.W $10A,0	;bwid-bpl	;RISULTATO = 80 ?
+
+	DC.W $102,0	;SCROLL REGISTER (AND PLAYFIELD PRI)
 
 	Palette:
 	DC.W $0180,$0000,$0182,$0334,$0184,$0445,$0186,$0556
@@ -413,29 +401,7 @@ COPPER:
 	DC.W $138,0,$13A,0	; 6
 	DC.W $13C,0,$13E,0	; 7
 
-	DC.W $1A6
-	LOGOCOL1:
-	DC.W $000	; COLOR0-1
-	DC.W $1AE
-	LOGOCOL2:
-	DC.W $000	; COLOR2-3
-	DC.W $1B6
-	LOGOCOL3:
-	DC.W $000	; COLOR4-5
-
 	COPPERWAITS:
-	; HW DISPLACEMENT
-	;DC.W $002D,$FFFE
-	;DC.W $F102,$A68E
-	;DC.W $FE07,$FFFE
-	;DC.W $F102,$1F83
-
-	;DC.W $FE07,$FFFE
-	;DC.W $0180,$0FFF
-	;DC.W $FF07,$FFFE
-	;DC.W $0180,$0011	; SCROLLAREA BG COLOR
-	;DC.W $0182,$0AAA	; SCROLLING TEXT WHITE ON
-
 	DC.W $FFDF,$FFFE	; allow VPOS>$ff
 
 	DC.W $2201,$FF00	; horizontal position masked off
