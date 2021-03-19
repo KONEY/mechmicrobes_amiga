@@ -10,10 +10,7 @@ Start:
 ;*--- save view+coppers ---*
 
 .yes68k:
-	CMP.W	#$27,$14(A6)	; $27 = 39 = KS 3.0 | EXEC VERS
-	BGE.S	.belowKS30	; DONT MESS WITH OS IRQs - NO FLICKER ON A3000
-	MOVE.L	$78.W,A4		; or $6c(a0) with a0=vbrbase BY KONEY
-	.belowKS30:
+	MOVE.L $78.W,A4		; or $6c(a0) with a0=vbrbase BY KONEY
 	lea .GfxLib(PC),a1		;either way return to here and open
 	jsr -408(a6)		;graphics library
 	tst.l d0			;if not OK,

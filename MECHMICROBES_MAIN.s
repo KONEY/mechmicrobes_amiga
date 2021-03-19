@@ -6,11 +6,11 @@
 	INCLUDE	"PT12_OPTIONS.i"
 	INCLUDE	"P6112-Play-stripped.i"
 ;********** Constants **********
-w=	336		; screen width
-h=	256		; screen height
-bpls=	4		; depth
-bpl=	w/16*2		; byte-width of 1 bitplane line (40bytes)
-bwid=	bpls*bpl		; byte-width of 1 pixel line (all bpls)
+w=320		;screen width, height, depth
+h=256
+bpls=4		;handy values:
+bpl=w/16*2	;byte-width of 1 bitplane line (40)
+bwid=bpls*bpl	;byte-width of 1 pixel line (all bpls)
 MARGINX=(320/2)
 MARGINY=(256/2)
 TrigShift=7
@@ -58,7 +58,6 @@ Demo:				;a4=VBR, a6=Custom Registers Base addr
 	MULU	#5,D2
 	DIVU	#2,D2
 	SUB.W	D2,D0	
-	;ADD.W	#MARGIN,D0
 	MOVE.W	D0,(A2)+
 	DBRA	D1,.calcuCoords
 	; ** POINTS TO COORDS **
@@ -78,7 +77,7 @@ MainLoop:
 	movem.l	a2-a3,DrawBuffer	;draw into a2, show a3
 	;*--- show one... ---*
 	move.l	a3,a0
-	move.l	#bpl*h,d0
+	move.l	#bpl*256,d0
 	lea	BplPtrs+2,a1
 	moveq	#bpls-1,d1
 	bsr.w	PokePtrs
@@ -86,15 +85,11 @@ MainLoop:
 	move.l	a2,a1
 	;bsr	ClearScreen
 
-	MOVE.L	BITPLANE,DrawBuffer
+	bsr	WaitBlitter
+
+	MOVE.L	#BITPLANE,DrawBuffer
 
 	; do stuff here :)
-
-	bsr.w	InitLine		; inizializza line-mode
-
-	;move.w	#$ffff,d0		; linea continua
-	;bsr.w	SetPattern	; definisce pattern
-	MOVE.W	#$FFFF,BLTBDAT	; BLTBDAT = pattern della linea!
 
 	MOVE.W	#24-1,D7
 	LEA	KONEY,A2
@@ -125,12 +120,32 @@ MainLoop:
 
 	MOVEM.L	(SP)+,D0-D1
 
+	bsr.w	InitLine		; inizializza line-mode
+	MOVE.W	#$FFFF,BLTBDAT	; BLTBDAT = pattern della linea!
 	BSR.W	Drawline
 
 	MOVEM.L	(SP)+,D7
 	DBRA	D7,.fetchCoordz
 
 	;*--- main loop end ---*
+
+	; **** JOYSTICK TEST ****
+	MOVE.W	$DFF00C,D0
+	AND.W	#$0303,D0
+	MOVE.W	D0,D1
+	ADD.W	D1,D1
+	ADD.W	#$0101,D0
+	ADD.W	D1,D0
+	BTST	#9,D0
+	BNE.S	.notLeft
+	SUB.W	#2,ANGLE
+	.notLeft:
+	BTST	#1,D0
+	BNE.S	.notRight
+	ADD.W	#2,ANGLE
+	.notRight:
+	; **** JOYSTICK TEST ****
+
 	ENDING_CODE:
 	BTST	#6,$BFE001
 	BNE.S	.DontShowRasterTime
@@ -272,7 +287,7 @@ DRAWL:
 
 	lsl.w	#$02,d3		; D3=4*DY
 	add.w	d2,d2		; D2=2*DX
-
+	BSR	WaitBlitter
 	move.w	d3,BLTBMOD	; BLTBMOD=4*DY
 	sub.w	d2,d3		; D3=4*DY-2*DX
 	move.w	d3,BLTAPTL	; BLTAPTL=4*DY-2*DX
@@ -281,7 +296,7 @@ DRAWL:
 	tst.w	d3
 	bpl.s	OK1		; se 4*DY-2*DX>0 salta..
 	or.w	#$0040,d5	; altrimenti setta il bit SIGN
-OK1:
+	OK1:
 	move.w	d0,BLTCON0	; BLTCON0
 	move.w	d5,BLTCON1	; BLTCON1
 	sub.w	d2,d3		; D3=4*DY-4*DX
@@ -324,7 +339,7 @@ __ROTATE:
 	INCLUDE	"sincosin_table.i"	; VALUES
 
 ANGLE:	DC.W 90
-PXLSIDE:	DC.W 16
+PXLSIDE:	DC.W 12
 
 KONEY:	; ROTATED 90 DEG
 	DC.W 0,0,1,0
@@ -371,7 +386,7 @@ COPPER:
 	DC.W $102,0	;SCROLL REGISTER (AND PLAYFIELD PRI)
 
 	Palette:
-	DC.W $0180,$0000,$0182,$0334,$0184,$0445,$0186,$0556
+	DC.W $0180,$0000,$0182,$0FFF,$0184,$0445,$0186,$0556
 	DC.W $0188,$0667,$018A,$0333,$018C,$0667,$018E,$0777
 	DC.W $0190,$0888,$0192,$0888,$0194,$0999,$0196,$0AAA
 	DC.W $0198,$0BBB,$019A,$0CCC,$019C,$0DDD,$019E,$0FFF
@@ -389,7 +404,7 @@ COPPER:
 	DC.W $F2,0
 	DC.W $F4,0
 	DC.W $F6,0		;full 6 ptrs, in case you increase bpls
-	DC.W $100,bpls*$1000+$200	;enable bitplanes
+	DC.W $100,BPLS*$1000+$200	;enable bitplanes
 
 	SpritePointers:
 	DC.W $120,0,$122,0	; 0
@@ -403,43 +418,6 @@ COPPER:
 
 	COPPERWAITS:
 	DC.W $FFDF,$FFFE	; allow VPOS>$ff
-
-	DC.W $2201,$FF00	; horizontal position masked off
-	DC.W $0108,$0002	; BPL1MOD - Should fix the scroll
-	DC.W $010A,$0002	; BPL2MOD - when glitch but dont work :)
-	DC.W $0188,$0FFF	; BG COLOR
-	
-	DC.W $2301,$FF00	; horizontal position masked off
-	DC.W $0188,$0DDD	; BG COLOR
-	DC.W $0198,$0000	; TXT COLOR
-	
-	;DC.W $2401,$FF00	; horizontal position masked off
-	;DC.W $0198,$0222	; TXT COLOR
-	
-	DC.W $2501,$FF00	; horizontal position masked off
-	DC.W $0188,$0AAA	; BG COLOR
-	;DC.W $0198,$0444	; TXT COLOR
-
-	;DC.W $2601,$FF00	; horizontal position masked off
-	;DC.W $0198,$0333	; TXT COLOR
-
-	DC.W $2701,$FF00	; horizontal position masked off
-	DC.W $0188,$0888	; BG COLOR
-	;DC.W $0198,$0666	; TXT COLOR
-
-	;DC.W $2801,$FF00	; horizontal position masked off
-	;DC.W $0198,$0999	; TXT COLOR
-
-	DC.W $2901,$FF00	; horizontal position masked off
-	DC.W $0188,$0555	; BG COLOR
-	;DC.W $0198,$0AAA	; TXT COLOR
-
-	DC.W $2A01,$FF00	; horizontal position masked off
-	DC.W $0188,$0333	; BG COLOR
-	;DC.W $0198,$0EEE	; TXT COLOR
-
-	DC.W $2B01,$FF00	; RESTORE BLACK
-	DC.W $0188,$0000
 
 	DC.W $FFFF,$FFFE	;magic value to end copperlist
 _COPPER:
