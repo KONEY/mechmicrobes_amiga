@@ -11,8 +11,8 @@ h=256
 bpls=4		;handy values:
 bpl=w/16*2	;byte-width of 1 bitplane line (40)
 bwid=bpls*bpl	;byte-width of 1 pixel line (all bpls)
-MARGINX=(320/2)
-MARGINY=(256/2)
+MARGINX=(w/2)
+MARGINY=(h/2)
 TrigShift=7
 ;*************
 MODSTART_POS=1		; start music at position # !! MUST BE EVEN FOR 16BIT
@@ -65,8 +65,7 @@ Demo:				;a4=VBR, a6=Custom Registers Base addr
 
 	;---  Call P61_Init  ---
 
-	MOVE.L	#COPPER,$80(a6)
-
+	MOVE.L	#COPPER,$DFF080	; ATTACH THE COPPER
 ;********************  main loop  ********************
 MainLoop:
 	move.w	#$12c,d0		;No buffering, so wait until raster
@@ -83,13 +82,40 @@ MainLoop:
 	bsr.w	PokePtrs
 	;*--- ...draw into the other(a2) ---*
 	move.l	a2,a1
-	;bsr	ClearScreen
-
-	bsr	WaitBlitter
-
-	MOVE.L	#BITPLANE,DrawBuffer
+	MOVE.L	BITPLANE_PTR,DrawBuffer
 
 	; do stuff here :)
+
+	; **** JOYSTICK TEST ****
+	MOVE.W	$DFF00C,D0
+	AND.W	#$0303,D0
+	MOVE.W	D0,D1
+	ADD.W	D1,D1
+	ADD.W	#$0101,D0
+	ADD.W	D1,D0
+	BTST	#9,D0
+	BEQ.S	.notLeft
+	MOVE.W	ANGLE,D2
+	CMPI.W	#0,D2
+	BNE.S	.dontResetL
+	MOVE.W	#360,D2
+	.dontResetL:
+	SUB.W	#2,D2
+	MOVE.W	D2,ANGLE
+	bsr	ClearBuffer2
+	.notLeft:
+	BTST	#1,D0
+	BEQ.S	.notRight
+	MOVE.W	ANGLE,D2
+	ADD.W	#2,D2
+	CMPI.W	#360,D2
+	BNE.S	.dontResetR
+	CLR.W	D2
+	.dontResetR:
+	MOVE.W	D2,ANGLE
+	bsr	ClearBuffer2
+	.notRight:
+	; **** JOYSTICK TEST ****
 
 	MOVE.W	#24-1,D7
 	LEA	KONEY,A2
@@ -129,23 +155,6 @@ MainLoop:
 
 	;*--- main loop end ---*
 
-	; **** JOYSTICK TEST ****
-	MOVE.W	$DFF00C,D0
-	AND.W	#$0303,D0
-	MOVE.W	D0,D1
-	ADD.W	D1,D1
-	ADD.W	#$0101,D0
-	ADD.W	D1,D0
-	BTST	#9,D0
-	BNE.S	.notLeft
-	SUB.W	#2,ANGLE
-	.notLeft:
-	BTST	#1,D0
-	BNE.S	.notRight
-	ADD.W	#2,ANGLE
-	.notRight:
-	; **** JOYSTICK TEST ****
-
 	ENDING_CODE:
 	BTST	#6,$BFE001
 	BNE.S	.DontShowRasterTime
@@ -168,27 +177,40 @@ PokePtrs:				; Generic, poke ptrs into copper list
 	add.l	d0,a0		;next ptr
 	dbf	d1,.bpll
 	rts
-
 ClearScreen:			; a1=screen destination address to clear
 	bsr	WaitBlitter
-	clr.w	$66(a6)		; destination modulo
-	move.l	#$01000000,$40(a6)	; set operation type in BLTCON0/1
-	move.l	a1,$54(a6)	; destination address
-	move.l	#h*bpls*64+bpl/2,$58(a6)	;blitter operation size
+	clr.w	BLTDMOD		; destination modulo
+	move.l	#$01000000,BLTCON0	; set operation type in BLTCON0/1
+	move.l	a1,BLTDPTH	; destination address
+	move.l	#h*bpls*64+bpl/2,BLTSIZE	;blitter operation size
+	rts
+VBint:				; Blank template VERTB interrupt
+	btst	#5,$DFF01F	; check if it's our vertb int.
+	beq.s	.notvb
+	move.w	#$20,$DFF09C	; poll irq bit
+	move.w	#$20,$DFF09C	; KONEY REFACTOR
+	.notvb:	
+	rte
+ClearBuffer:			; by KONEY
+	bsr	WaitBlitter
+	clr.w	BLTDMOD		; destination modulo
+	move.l	#$01000000,BLTCON0	; set operation type in BLTCON0/1
+	move.l	#BITPLANE,BLTDPTH	; destination address
+	move.l	#h*bpls*64+bpl/2,BLTSIZE	;blitter operation size
+	rts
+ClearBuffer2:
+	.WAIT:	
+	BTST	#$E,$dff002
+	BNE.S	.WAIT
+	move.w	#$09f0,BLTCON0	;A**,Shift 0, A -> D
+	move.w	#0,BLTCON1	;Everything Normal
+	move.w	#0,BLTAMOD	;Init modulo Sou. A
+	move.w	#0,BLTDMOD	;Init modulo Dest D
+	move.l	#Empty,BLTAPTH	;Source
+	move.l	#BITPLANE,BLTDPTH	;Dest
+	move.w	#(h*64)+(w/16),BLTSIZE	;Start Blitter (Blitsize)
 	rts
 
-VBint:				; Blank template VERTB interrupt
-	movem.l	d0/a6,-(sp)	; Save used registers
-	lea	$dff000,a6
-	btst	#5,$1f(a6)	; check if it's our vertb int.
-	beq.s	.notvb
-	;*--- do stuff here ---*
-	moveq	#$20,d0		; poll irq bit
-	move.w	d0,$9c(a6)
-	move.w	d0,$9c(a6)
-	.notvb:	
-	movem.l	(sp)+,d0/a6	; restore
-	rte
 
 ;******************************************************************************
 ; Questa routine effettua il disegno della linea. prende come parametri gli
@@ -199,11 +221,6 @@ VBint:				; Blank template VERTB interrupt
 ; D3 - Y2 (coord. Y di P2)
 ; A0 - indirizzo bitplane
 ;******************************************************************************
-;	    ("`-/")_.-'"``-._
-;	     . . `; -._    )-;-,_`)
-;	FL  (v_,)'  _  )`-.\  ``-'
-;	   _.- _..-_/ / ((.'
-;	 ((,.-'   ((,/
 
 Drawline:
 	LEA	BITPLANE,A0
@@ -275,6 +292,8 @@ DRAWL:
 	or.w	#$0BCA,d0	; con un OR ottengo il valore da scrivere
 				; in BLTCON0. Con questo valore di LF ($4A)
 				; si disegnano linee in EOR con lo sfondo.
+				; #$0BCA
+	;CLR.W	$100		; DEBUG | w 0 100 2
 
 	lsr.w	#4,d1		; cancella i 4 bit bassi della X
 	add.w	d1,d1		; ottiene l'offset X in bytes
@@ -290,8 +309,7 @@ DRAWL:
 	BSR	WaitBlitter
 	move.w	d3,BLTBMOD	; BLTBMOD=4*DY
 	sub.w	d2,d3		; D3=4*DY-2*DX
-	move.w	d3,BLTAPTL	; BLTAPTL=4*DY-2*DX
-				; prepara valore da scrivere in BLTCON1
+	move.w	d3,BLTAPTL	; BLTAPTL=4*DY-2*DX prep val for BLTCON1
 	or.w	#$0001,d5		; setta bit 0 (attiva line-mode)
 	tst.w	d3
 	bpl.s	OK1		; se 4*DY-2*DX>0 salta..
@@ -339,7 +357,7 @@ __ROTATE:
 	INCLUDE	"sincosin_table.i"	; VALUES
 
 ANGLE:	DC.W 90
-PXLSIDE:	DC.W 12
+PXLSIDE:	DC.W 8
 
 KONEY:	; ROTATED 90 DEG
 	DC.W 0,0,1,0
@@ -367,6 +385,7 @@ KONEY:	; ROTATED 90 DEG
 	DC.W 1,1,0,1
 	DC.W 0,1,0,0
 
+BITPLANE_PTR:	DC.L BITPLANE	; bitplane azzerato lowres
 DrawBuffer:	DC.L SCREEN2	; pointers to buffers
 ViewBuffer:	DC.L SCREEN1	; to be swapped
 
@@ -386,7 +405,7 @@ COPPER:
 	DC.W $102,0	;SCROLL REGISTER (AND PLAYFIELD PRI)
 
 	Palette:
-	DC.W $0180,$0000,$0182,$0FFF,$0184,$0445,$0186,$0556
+	DC.W $0180,$0888,$0182,$0000,$0184,$0445,$0186,$0556
 	DC.W $0188,$0667,$018A,$0333,$018C,$0667,$018E,$0777
 	DC.W $0190,$0888,$0192,$0888,$0194,$0999,$0196,$0AAA
 	DC.W $0198,$0BBB,$019A,$0CCC,$019C,$0DDD,$019E,$0FFF
@@ -427,6 +446,7 @@ _COPPER:
 ;*******************************************************************************
 
 BITPLANE:		DS.B h*bwid	; bitplane azzerato lowres
+EMPTY:		DS.B h*bpl
 SCREEN1:		DS.B h*bwid	; Define storage for buffer 1
 SCREEN2:		DS.B h*bwid	; two buffers
 
