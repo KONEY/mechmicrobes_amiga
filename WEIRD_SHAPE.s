@@ -8,7 +8,7 @@
 ;********** Constants **********
 w=320		;screen width, height, depth
 h=256
-bpls=5		;handy values:
+bpls=4		;handy values:
 bpl=w/16*2	;byte-width of 1 bitplane line (40)
 bwid=bpls*bpl	;byte-width of 1 pixel line (all bpls)
 MARGINX=(w/2)
@@ -53,10 +53,10 @@ Demo:				;a4=VBR, a6=Custom Registers Base addr
 	LEA	KONEY,A2
 	.calcuCoords:
 	MOVE.W	(A2),D0
-	MOVE.W	#2,D2
-	MULU.W	D2,D0
-	MULU.W	#5,D2	; CENTER A 5x5 OBJ
-	DIVU.W	#2,D2	
+	MOVE.W	#1,D2
+	MULU	D2,D0
+	MULU	#5,D2	; CENTER A 5x5 OBJ
+	DIVU	#2,D2	
 	SUB.W	D2,D0	
 	MOVE.W	D0,(A2)+
 	DBRA	D1,.calcuCoords
@@ -87,13 +87,13 @@ MainLoop:
 	; do stuff here :)
 
 	; **** JOYSTICK TEST ****
-	MOVE.W	$DFF00C,D0	; FROM EAB
+	MOVE.W	$DFF00C,D0
 	AND.W	#$0303,D0
 	MOVE.W	D0,D1
 	ADD.W	D1,D1
 	ADD.W	#$0101,D0
 	ADD.W	D1,D0
-	BTST	#9,D0		; 9 LEFT
+	BTST	#9,D0
 	BEQ.S	.notLeft
 	MOVE.W	ANGLE,D2
 	CMPI.W	#0,D2
@@ -102,9 +102,12 @@ MainLoop:
 	.dontResetL:
 	SUB.W	#2,D2
 	MOVE.W	D2,ANGLE
+	ADD.W	#1,Z_POS
+	MOVE.W	Z_POS,D4
+	CLR.W	$100		; DEBUG | w 0 100 2
 	bsr	ClearBuffer2
 	.notLeft:
-	BTST	#1,D0		; 1 RIGHT
+	BTST	#1,D0
 	BEQ.S	.notRight
 	MOVE.W	ANGLE,D2
 	ADD.W	#2,D2
@@ -115,18 +118,6 @@ MainLoop:
 	MOVE.W	D2,ANGLE
 	bsr	ClearBuffer2
 	.notRight:
-	BTST	#10,D0		; 10 UP
-	BEQ.S	.notDown
-	ADD.W	#1,Z_POS
-	MOVE.W	Z_POS,D4
-	bsr	ClearBuffer2
-	.notDown:
-	BTST	#2,D0		; 2 DOWN
-	BEQ.S	.notUp
-	SUB.W	#1,Z_POS
-	MOVE.W	Z_POS,D4
-	bsr	ClearBuffer2
-	.notUp:
 	; **** JOYSTICK TEST ****
 
 	MOVE.W	#24-1,D7
@@ -136,8 +127,6 @@ MainLoop:
 
 	MOVE.W	(A2)+,D0		; X1
 	MOVE.W	(A2)+,D1		; Y1
-	MULU.W	Z_POS,D0
-	MULU.W	Z_POS,D1
 
 	; **** ROTATING??? ****
 	MOVE.W	ANGLE,D7
@@ -152,8 +141,6 @@ MainLoop:
 
 	MOVE.W	(A2)+,D0		; X2
 	MOVE.W	(A2)+,D1		; Y2
-	MULU.W	Z_POS,D0
-	MULU.W	Z_POS,D1
 
 	BSR.W	__ROTATE
 
@@ -163,7 +150,10 @@ MainLoop:
 	MOVEM.L	(SP)+,D0-D1
 
 	; *** Z-POSITION ***
-
+	MULU.W	Z_POS,D0
+	MULU.W	Z_POS,D1
+	MULU.W	Z_POS,D2
+	MULU.W	Z_POS,D3
 	; *** Z-POSITION ***
 
 	bsr.w	InitLine		; inizializza line-mode
@@ -376,7 +366,7 @@ __ROTATE:
 	INCLUDE	"sincosin_table.i"	; VALUES
 
 ANGLE:	DC.W 90
-Z_POS:	DC.W 0
+Z_POS:	DC.W 2
 PXLSIDE:	DC.W 16
 
 KONEY:	; ROTATED 90 DEG
