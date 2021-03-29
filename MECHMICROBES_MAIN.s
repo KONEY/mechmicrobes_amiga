@@ -14,6 +14,7 @@ bwid=bpls*bpl	;byte-width of 1 pixel line (all bpls)
 MARGINX=(w/2)
 MARGINY=(h/2)
 TrigShift=7
+Z_Shift=40
 ;*************
 MODSTART_POS=1		; start music at position # !! MUST BE EVEN FOR 16BIT
 ;*************
@@ -53,11 +54,11 @@ Demo:				;a4=VBR, a6=Custom Registers Base addr
 	LEA	KONEY,A2
 	.calcuCoords:
 	MOVE.W	(A2),D0
-	MOVE.W	#2,D2
+	MOVE.W	PXLSIDE,D2	; INITIAL 
 	MULU.W	D2,D0
-	MULU.W	#5,D2	; CENTER A 5x5 OBJ
-	DIVU.W	#2,D2	
-	SUB.W	D2,D0	
+	;MULU.W	#5,D2	; CENTER A 5x5 OBJ
+	;DIVU.W	#2,D2	
+	;SUB.W	D2,D0	
 	MOVE.W	D0,(A2)+
 	DBRA	D1,.calcuCoords
 	; ** POINTS TO COORDS **
@@ -117,14 +118,20 @@ MainLoop:
 	.notRight:
 	BTST	#10,D0		; 10 UP
 	BEQ.S	.notDown
-	ADD.W	#1,Z_POS
+	ADD.W	#1,PXLSIDE
+	SUB.W	#1,Z_POS
 	MOVE.W	Z_POS,D4
+	ADD.W	#Z_Shift,D4
+	MOVE.W	D4,Z_FACT
 	bsr	ClearBuffer2
 	.notDown:
 	BTST	#2,D0		; 2 DOWN
 	BEQ.S	.notUp
-	SUB.W	#1,Z_POS
+	SUB.W	#1,PXLSIDE
+	ADD.W	#1,Z_POS
 	MOVE.W	Z_POS,D4
+	ADD.W	#Z_Shift,D4
+	MOVE.W	D4,Z_FACT
 	bsr	ClearBuffer2
 	.notUp:
 	; **** JOYSTICK TEST ****
@@ -136,8 +143,17 @@ MainLoop:
 
 	MOVE.W	(A2)+,D0		; X1
 	MOVE.W	(A2)+,D1		; Y1
-	MULU.W	Z_POS,D0
-	MULU.W	Z_POS,D1
+	; *** Z-POSITION ***
+	MULU.W	#Z_Shift,D0
+	MULU.W	#Z_Shift,D1
+	DIVU	Z_FACT,D0
+	DIVU	Z_FACT,D1
+
+	;MOVE.W	PXLSIDE,D7
+	;MULU.W	#5,D7	; CENTER A 5x5 OBJ
+	;DIVU.W	#2,D7	
+	;SUB.W	D7,D0
+	;SUB.W	D7,D1
 
 	; **** ROTATING??? ****
 	MOVE.W	ANGLE,D7
@@ -152,8 +168,11 @@ MainLoop:
 
 	MOVE.W	(A2)+,D0		; X2
 	MOVE.W	(A2)+,D1		; Y2
-	MULU.W	Z_POS,D0
-	MULU.W	Z_POS,D1
+	; *** Z-POSITION ***
+	MULU.W	#Z_Shift,D0
+	MULU.W	#Z_Shift,D1
+	DIVU	Z_FACT,D0
+	DIVU	Z_FACT,D1
 
 	BSR.W	__ROTATE
 
@@ -161,10 +180,6 @@ MainLoop:
 	MOVE.W	D1,D3		; Y2
 
 	MOVEM.L	(SP)+,D0-D1
-
-	; *** Z-POSITION ***
-
-	; *** Z-POSITION ***
 
 	bsr.w	InitLine		; inizializza line-mode
 	MOVE.W	#$FFFF,BLTBDAT	; BLTBDAT = pattern della linea!
@@ -244,6 +259,7 @@ ClearBuffer2:
 
 Drawline:
 	LEA	BITPLANE,A0
+
 	ADD.W	#MARGINX,D0
 	ADD.W	#MARGINY,D1
 	ADD.W	#MARGINX,D2
@@ -377,6 +393,7 @@ __ROTATE:
 
 ANGLE:	DC.W 90
 Z_POS:	DC.W 0
+Z_FACT:	DC.W Z_Shift
 PXLSIDE:	DC.W 16
 
 KONEY:	; ROTATED 90 DEG
