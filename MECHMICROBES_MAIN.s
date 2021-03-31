@@ -14,7 +14,8 @@ bwid=bpls*bpl	;byte-width of 1 pixel line (all bpls)
 MARGINX=(w/2)
 MARGINY=(h/2)
 TrigShift=7
-Z_Shift=40
+PXLSIDE=16
+Z_Shift=PXLSIDE*5/2	; 5x5 obj
 ;*************
 MODSTART_POS=1		; start music at position # !! MUST BE EVEN FOR 16BIT
 ;*************
@@ -54,11 +55,11 @@ Demo:				;a4=VBR, a6=Custom Registers Base addr
 	LEA	KONEY,A2
 	.calcuCoords:
 	MOVE.W	(A2),D0
-	MOVE.W	PXLSIDE,D2	; INITIAL 
+	MOVE.W	#PXLSIDE,D2	; INITIAL 
 	MULU.W	D2,D0
 	;MULU.W	#5,D2	; CENTER A 5x5 OBJ
 	;DIVU.W	#2,D2	
-	;SUB.W	D2,D0	
+	;SUB.W	D2,D0
 	MOVE.W	D0,(A2)+
 	DBRA	D1,.calcuCoords
 	; ** POINTS TO COORDS **
@@ -118,43 +119,42 @@ MainLoop:
 	.notRight:
 	BTST	#10,D0		; 10 UP
 	BEQ.S	.notDown
-	ADD.W	#1,PXLSIDE
 	SUB.W	#1,Z_POS
 	MOVE.W	Z_POS,D4
 	ADD.W	#Z_Shift,D4
 	MOVE.W	D4,Z_FACT
+	MOVE.W	#Z_Shift,D7	; CENTER
+	MULU.W	D7,D7
+	DIVU.W	D4,D7
+	MOVE.W	D7,CENTER
 	bsr	ClearBuffer2
 	.notDown:
 	BTST	#2,D0		; 2 DOWN
 	BEQ.S	.notUp
-	SUB.W	#1,PXLSIDE
 	ADD.W	#1,Z_POS
 	MOVE.W	Z_POS,D4
 	ADD.W	#Z_Shift,D4
 	MOVE.W	D4,Z_FACT
+	MOVE.W	#Z_Shift,D7	; CENTER
+	MULU.W	D7,D7
+	DIVU.W	D4,D7
+	MOVE.W	D7,CENTER
 	bsr	ClearBuffer2
 	.notUp:
 	; **** JOYSTICK TEST ****
 
+	bsr.w	InitLine		; inizializza line-mode
+	MOVE.W	#$FFFF,BLTBDAT	; BLTBDAT = pattern della linea!
+
 	MOVE.W	#24-1,D7
+	MOVE.W	#0,XY_INIT
 	LEA	KONEY,A2
+
 	.fetchCoordz:
 	MOVEM.L	D7,-(SP)
 
 	MOVE.W	(A2)+,D0		; X1
 	MOVE.W	(A2)+,D1		; Y1
-	; *** Z-POSITION ***
-	MULU.W	#Z_Shift,D0
-	MULU.W	#Z_Shift,D1
-	DIVU	Z_FACT,D0
-	DIVU	Z_FACT,D1
-
-	;MOVE.W	PXLSIDE,D7
-	;MULU.W	#5,D7	; CENTER A 5x5 OBJ
-	;DIVU.W	#2,D7	
-	;SUB.W	D7,D0
-	;SUB.W	D7,D1
-
 	; **** ROTATING??? ****
 	MOVE.W	ANGLE,D7
 	LEA.L	SinTbl(pc),A0
@@ -162,17 +162,41 @@ MainLoop:
 	LEA.L	CosTbl(pc),A0
 	MOVE.W	(A0,D7),D4
 
+	; **** OPTIMIZATION!! ****
+	MOVE.W	XY_INIT,D7
+	CMP.W	#0,D7
+	BNE.S	.notFirstLoop
+	MOVE.W	#1,XY_INIT
+	; **** Z-POSITION ****
+	MULU.W	#Z_Shift,D0
+	MULU.W	#Z_Shift,D1
+	DIVU.W	Z_FACT,D0
+	DIVU.W	Z_FACT,D1
+	SUB.W	CENTER,D0
+	SUB.W	CENTER,D1
+	MOVE.W	D0,X_TEMP
+	MOVE.W	D1,Y_TEMP
+	.notFirstLoop:
+	; **** OPTIMIZATION!! ****
+
+	MOVE.W	X_TEMP,D0
+	MOVE.W	Y_TEMP,D1
+
 	BSR.W	__ROTATE
 
 	MOVEM.L	D0-D1,-(SP)
 
 	MOVE.W	(A2)+,D0		; X2
 	MOVE.W	(A2)+,D1		; Y2
-	; *** Z-POSITION ***
+	; **** Z-POSITION ****
 	MULU.W	#Z_Shift,D0
 	MULU.W	#Z_Shift,D1
-	DIVU	Z_FACT,D0
-	DIVU	Z_FACT,D1
+	DIVU.W	Z_FACT,D0
+	DIVU.W	Z_FACT,D1
+	SUB.W	CENTER,D0
+	SUB.W	CENTER,D1
+	MOVE.W	D0,X_TEMP
+	MOVE.W	D1,Y_TEMP
 
 	BSR.W	__ROTATE
 
@@ -181,8 +205,6 @@ MainLoop:
 
 	MOVEM.L	(SP)+,D0-D1
 
-	bsr.w	InitLine		; inizializza line-mode
-	MOVE.W	#$FFFF,BLTBDAT	; BLTBDAT = pattern della linea!
 	BSR.W	Drawline
 
 	MOVEM.L	(SP)+,D7
@@ -193,7 +215,7 @@ MainLoop:
 	ENDING_CODE:
 	BTST	#6,$BFE001
 	BNE.S	.DontShowRasterTime
-	MOVE.W	#$0FF,$DFF180	; show rastertime left down to $12c
+	MOVE.W	#$F0F,$DFF180	; show rastertime left down to $12c
 	.DontShowRasterTime:
 	BTST	#2,$DFF016	; POTINP - RMB pressed?
 	BNE.W	MainLoop		; then loop
@@ -246,7 +268,6 @@ ClearBuffer2:
 	move.w	#(h*64)+(w/16),BLTSIZE	;Start Blitter (Blitsize)
 	rts
 
-
 ;******************************************************************************
 ; Questa routine effettua il disegno della linea. prende come parametri gli
 ; estremi della linea P1 e P2, e l'indirizzo del bitplane su cui disegnarla.
@@ -259,11 +280,11 @@ ClearBuffer2:
 
 Drawline:
 	LEA	BITPLANE,A0
-
 	ADD.W	#MARGINX,D0
 	ADD.W	#MARGINY,D1
 	ADD.W	#MARGINX,D2
 	ADD.W	#MARGINY,D3
+
 	; * scelta ottante
 	sub.w	d0,d2		; D2=X2-X1
 	bmi.s	DRAW4		; se negativo salta, altrimenti D2=DiffX
@@ -391,10 +412,13 @@ __ROTATE:
 ;********** Fastmem Data **********
 	INCLUDE	"sincosin_table.i"	; VALUES
 
-ANGLE:	DC.W 90
-Z_POS:	DC.W 0
-Z_FACT:	DC.W Z_Shift
-PXLSIDE:	DC.W 16
+ANGLE:		DC.W 90
+Z_POS:		DC.W 0
+Z_FACT:		DC.W Z_Shift
+CENTER:		DC.W Z_Shift
+X_TEMP:		DC.W 0
+Y_TEMP:		DC.W 0
+XY_INIT:		DC.W 0
 
 KONEY:	; ROTATED 90 DEG
 	DC.W 0,0,1,0
@@ -442,7 +466,7 @@ COPPER:
 	DC.W $102,0	;SCROLL REGISTER (AND PLAYFIELD PRI)
 
 	Palette:
-	DC.W $0180,$002A,$0182,$0FFF,$0184,$0445,$0186,$0556
+	DC.W $0180,$0AAA,$0182,$0000,$0184,$0445,$0186,$0556
 	DC.W $0188,$0667,$018A,$0333,$018C,$0667,$018E,$0777
 	DC.W $0190,$0888,$0192,$0888,$0194,$0999,$0196,$0AAA
 	DC.W $0198,$0BBB,$019A,$0CCC,$019C,$0DDD,$019E,$0FFF
