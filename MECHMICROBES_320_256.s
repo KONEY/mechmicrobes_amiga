@@ -6,13 +6,13 @@
 	INCLUDE	"PT12_OPTIONS.i"
 	INCLUDE	"P6112-Play-stripped.i"
 ;********** Constants **********
-w=368		;screen width, height, depth
-h=230
+w=320		;screen width, height, depth
+h=256
 bpls=5		;handy values:
 bpl=w/16*2	;byte-width of 1 bitplane line (40)
 bwid=bpls*bpl	;byte-width of 1 pixel line (all bpls)
-MARGINX=160
-MARGINY=128
+MARGINX=(w/2)
+MARGINY=(h/2)
 TrigShift=7
 PXLSIDE=16
 Z_Shift=PXLSIDE*5/2	; 5x5 obj
@@ -67,6 +67,7 @@ Demo:				;a4=VBR, a6=Custom Registers Base addr
 
 	;---  Call P61_Init  ---
 	
+	;CLR.W	$100		; DEBUG | w 0 100 2
 	;MOVE.W	#Z_Shift,D1
 	;MOVE.W	D1,D7
 	;LSL.W	#5,D1
@@ -92,10 +93,9 @@ MainLoop:
 	move.l	a2,a1
 
 	MOVE.L	BITPLANE_PTR,DrawBuffer
-	;MOVE.L	#TR909,DrawBuffer
 
 	; do stuff here :)
-	;CLR.W	$100		; DEBUG | w 0 100 2
+
 	; **** JOYSTICK TEST ****
 	MOVEM.W	$DFF00C,D0	; FROM EAB
 	ANDI.W	#$0303,D0
@@ -112,6 +112,7 @@ MainLoop:
 	.dontResetL:
 	SUBI.W	#2,D2
 	MOVE.W	D2,ANGLE
+	bsr	ClearBuffer2
 	.notLeft:
 	BTST	#1,D0		; 1 RIGHT
 	BEQ.S	.notRight
@@ -122,18 +123,11 @@ MainLoop:
 	MOVEQ.L	#0,D2
 	.dontResetR:
 	MOVE.W	D2,ANGLE
+	bsr	ClearBuffer2
 	.notRight:
 	BTST	#10,D0		; 10 UP
 	BEQ.S	.notDown
 	SUBI.W	#1,Z_POS
-	.notDown:
-	BTST	#2,D0		; 2 DOWN
-	BEQ.S	.notUp
-	ADDI.W	#1,Z_POS
-	bsr	ClearBuffer2
-	.notUp:
-	; **** JOYSTICK TEST ****
-
 	MOVE.W	Z_POS,D4
 	ADDI.W	#Z_Shift,D4
 	MOVE.W	D4,Z_FACT
@@ -141,6 +135,21 @@ MainLoop:
 	MULU.W	D7,D7
 	DIVU.W	D4,D7
 	MOVE.W	D7,CENTER
+	bsr	ClearBuffer2
+	.notDown:
+	BTST	#2,D0		; 2 DOWN
+	BEQ.S	.notUp
+	ADDI.W	#1,Z_POS
+	MOVE.W	Z_POS,D4
+	ADDI.W	#Z_Shift,D4
+	MOVE.W	D4,Z_FACT
+	MOVE.W	#Z_Shift,D7	; CENTER
+	MULU.W	D7,D7
+	DIVU.W	D4,D7
+	MOVE.W	D7,CENTER
+	bsr	ClearBuffer2
+	.notUp:
+	; **** JOYSTICK TEST ****
 
 	bsr.w	InitLine		; inizializza line-mode
 	MOVE.W	#$FFFF,BLTBDAT	; BLTBDAT = pattern della linea!
@@ -185,6 +194,7 @@ MainLoop:
 	BSR.W	__ROTATE
 
 	MOVEM.L	D0-D1,-(SP)
+
 	MOVE.W	(A2)+,D0		; X2
 	MOVE.W	(A2)+,D1		; Y2
 	; **** Z-POSITION ****
@@ -223,7 +233,7 @@ MainLoop:
 	RTS
 
 ;********** Demo Routines **********
-PokePtrs:					; Generic, poke ptrs into copper list
+PokePtrs:				; Generic, poke ptrs into copper list
 	.bpll:	
 	move.l	a0,d2
 	swap	d2
@@ -233,36 +243,38 @@ PokePtrs:					; Generic, poke ptrs into copper list
 	add.l	d0,a0		;next ptr
 	dbf	d1,.bpll
 	rts
-ClearScreen:				; a1=screen destination address to clear
+ClearScreen:			; a1=screen destination address to clear
 	bsr	WaitBlitter
 	clr.w	BLTDMOD		; destination modulo
 	move.l	#$01000000,BLTCON0	; set operation type in BLTCON0/1
 	move.l	a1,BLTDPTH	; destination address
 	move.l	#h*bpls*64+bpl/2,BLTSIZE	;blitter operation size
 	rts
-VBint:					; Blank template VERTB interrupt
+VBint:				; Blank template VERTB interrupt
 	btst	#5,$DFF01F	; check if it's our vertb int.
 	beq.s	.notvb
 	move.w	#$20,$DFF09C	; poll irq bit
 	move.w	#$20,$DFF09C	; KONEY REFACTOR
 	.notvb:	
 	rte
-ClearBuffer:				; by KONEY
+ClearBuffer:			; by KONEY
 	bsr	WaitBlitter
-	clr.w	BLTDMOD			; destination modulo
-	move.l	#$01000000,BLTCON0		; set operation type in BLTCON0/1
-	move.l	#BITPLANE,BLTDPTH		; destination address
-	MOVE.W	#(h*64)+(w/16),BLTSIZE	; Start Blitter (Blitsize)
+	clr.w	BLTDMOD		; destination modulo
+	move.l	#$01000000,BLTCON0	; set operation type in BLTCON0/1
+	move.l	#BITPLANE,BLTDPTH	; destination address
+	move.l	#h*bpls*64+bpl/2,BLTSIZE	;blitter operation size
 	rts
 ClearBuffer2:
-	bsr	WaitBlitter
-	MOVE.W	#$09f0,BLTCON0		; A**,Shift 0, A -> D
-	MOVE.W	#0,BLTCON1		; Everything Normal
-	MOVE.W	#0,BLTAMOD		; Init modulo Sou. A
-	MOVE.W	#0,BLTDMOD		; Init modulo Dest D
-	MOVE.L	#Empty,BLTAPTH		; Source
-	MOVE.L	#BITPLANE,BLTDPTH		; Dest
-	MOVE.W	#(h*64)+(w/16),BLTSIZE	; Start Blitter (Blitsize)
+	.WAIT:	
+	BTST	#$E,$DFF002
+	BNE.S	.WAIT
+	MOVE.W	#$09f0,BLTCON0	;A**,Shift 0, A -> D
+	MOVE.W	#0,BLTCON1	;Everything Normal
+	MOVE.W	#0,BLTAMOD	;Init modulo Sou. A
+	MOVE.W	#0,BLTDMOD	;Init modulo Dest D
+	MOVE.L	#Empty,BLTAPTH	;Source
+	MOVE.L	#BITPLANE,BLTDPTH	;Dest
+	MOVE.W	#(h*64)+(w/16),BLTSIZE	;Start Blitter (Blitsize)
 	RTS
 
 ;******************************************************************************
@@ -337,12 +349,8 @@ DRAW7:
 ; D5 = codice ottante
 
 DRAWL:
-	MOVE.W	D1,D4		; OPTIMIZING mulu.w #40,d1
-	LSL.W	#5,D1
-	LSL.W	#3,D4
-	ADD.W	D4,D1
-	;mulu.w	#40,d1		; offset Y
-	add.w	d1,a0		; aggiunge l'offset Y all'indirizzo
+	mulu.w	#40,d1		; offset Y
+	add.l	d1,a0		; aggiunge l'offset Y all'indirizzo
 
 	move.w	d0,d1		; copia la coordinata X
 	andi.w	#$000F,d0	; seleziona i 4 bit piu` bassi della X..
@@ -451,8 +459,6 @@ BITPLANE_PTR:	DC.L BITPLANE	; bitplane azzerato lowres
 DrawBuffer:	DC.L SCREEN2	; pointers to buffers
 ViewBuffer:	DC.L SCREEN1	; to be swapped
 
-TR909:	INCBIN "TR-909_368x230x5.raw"
-
 	SECTION	ChipData,DATA_C	;declared data that must be in chipmem
 
 COPPER:
@@ -469,14 +475,10 @@ COPPER:
 	DC.W $102,0	;SCROLL REGISTER (AND PLAYFIELD PRI)
 
 	Palette:
-	DC.W $0180,$0DDB,$0182,$0556,$0184,$0A98,$0186,$0ABA
-	DC.W $0188,$0E93,$018A,$0211,$018C,$0D61,$018E,$0898
-	DC.W $0190,$0EEC,$0192,$0EED,$0194,$0CCC,$0196,$0EC8
-	DC.W $0198,$0BB9,$019A,$0EEE,$019C,$0DDD,$019E,$0888
-	DC.W $01A0,$0853,$01A2,$0445,$01A4,$0777,$01A6,$0632
-	DC.W $01A8,$0DDD,$01AA,$0FFF,$01AC,$0CCB,$01AE,$0DDC
-	DC.W $01B0,$0223,$01B2,$0BBB,$01B4,$0676,$01B6,$0999
-	DC.W $01B8,$0AAA,$01BA,$0887,$01BC,$0B00,$01BE,$0F00
+	DC.W $0180,$0AAA,$0182,$0000,$0184,$0445,$0186,$0556
+	DC.W $0188,$0667,$018A,$0333,$018C,$0667,$018E,$0777
+	DC.W $0190,$0888,$0192,$0888,$0194,$0999,$0196,$0AAA
+	DC.W $0198,$0BBB,$019A,$0CCC,$019C,$0DDD,$019E,$0FFF
 
 	BplPtrs:
 	DC.W $E0,0
