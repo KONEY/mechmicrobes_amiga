@@ -11,8 +11,8 @@ h=230
 bpls=5		;handy values:
 bpl=w/16*2	;byte-width of 1 bitplane line (40)
 bwid=bpls*bpl	;byte-width of 1 pixel line (all bpls)
-MARGINX=160
-MARGINY=128
+MARGINX=(w/2)
+MARGINY=(h/2)
 TrigShift=7
 PXLSIDE=16
 Z_Shift=PXLSIDE*5/2	; 5x5 obj
@@ -91,8 +91,8 @@ MainLoop:
 	;*--- ...draw into the other(a2) ---*
 	move.l	a2,a1
 
-	MOVE.L	BITPLANE_PTR,DrawBuffer
-	;MOVE.L	#TR909,DrawBuffer
+	;MOVE.L	BITPLANE_PTR,DrawBuffer
+	MOVE.L	#TR909,DrawBuffer
 
 	; do stuff here :)
 	;CLR.W	$100		; DEBUG | w 0 100 2
@@ -223,7 +223,7 @@ MainLoop:
 	RTS
 
 ;********** Demo Routines **********
-PokePtrs:					; Generic, poke ptrs into copper list
+PokePtrs:				; Generic, poke ptrs into copper list
 	.bpll:	
 	move.l	a0,d2
 	swap	d2
@@ -233,14 +233,14 @@ PokePtrs:					; Generic, poke ptrs into copper list
 	add.l	d0,a0		;next ptr
 	dbf	d1,.bpll
 	rts
-ClearScreen:				; a1=screen destination address to clear
+ClearScreen:			; a1=screen destination address to clear
 	bsr	WaitBlitter
-	clr.w	BLTDMOD		; destination modulo
-	move.l	#$01000000,BLTCON0	; set operation type in BLTCON0/1
-	move.l	a1,BLTDPTH	; destination address
+	clr.w	BLTDMOD			; destination modulo
+	move.l	#$01000000,BLTCON0		; set operation type in BLTCON0/1
+	move.l	a1,BLTDPTH		; destination address
 	move.l	#h*bpls*64+bpl/2,BLTSIZE	;blitter operation size
 	rts
-VBint:					; Blank template VERTB interrupt
+VBint:				; Blank template VERTB interrupt
 	btst	#5,$DFF01F	; check if it's our vertb int.
 	beq.s	.notvb
 	move.w	#$20,$DFF09C	; poll irq bit
@@ -337,11 +337,11 @@ DRAW7:
 ; D5 = codice ottante
 
 DRAWL:
-	MOVE.W	D1,D4		; OPTIMIZING mulu.w #40,d1
-	LSL.W	#5,D1
-	LSL.W	#3,D4
-	ADD.W	D4,D1
-	;mulu.w	#40,d1		; offset Y
+	;MOVE.W	D1,D4		; OPTIMIZING mulu.w #40,d1
+	;LSL.W	#5,D1
+	;LSL.W	#3,D4
+	;ADD.W	D4,D1
+	mulu.w	#bpl,d1		; offset Y
 	add.w	d1,a0		; aggiunge l'offset Y all'indirizzo
 
 	move.w	d0,d1		; copia la coordinata X
@@ -390,8 +390,8 @@ InitLine:
 	moveq.l	#-1,d5
 	move.l	d5,BLTAFWM	; BLTAFWM/BLTALWM = $FFFF
 	move.w	#$8000,BLTADAT	; BLTADAT = $8000
-	move.w	#40,BLTCMOD	; BLTCMOD = 40
-	move.w	#40,BLTDMOD	; BLTDMOD = 40
+	move.w	#bpl,BLTCMOD	; BLTCMOD = 40
+	move.w	#bpl,BLTDMOD	; BLTDMOD = 40
 	rts
 
 ;******************************************************************************
@@ -451,16 +451,16 @@ BITPLANE_PTR:	DC.L BITPLANE	; bitplane azzerato lowres
 DrawBuffer:	DC.L SCREEN2	; pointers to buffers
 ViewBuffer:	DC.L SCREEN1	; to be swapped
 
-TR909:	INCBIN "TR-909_368x230x5.raw"
-
 	SECTION	ChipData,DATA_C	;declared data that must be in chipmem
+
+TR909:	INCBIN "TR-909_368x230x5.raw"
 
 COPPER:
 	DC.W $1FC,0	;Slow fetch mode, remove if AGA demo.
-	DC.W $8E,$2C81	;238h display window top, left | DIWSTRT - 11.393
-	DC.W $90,$2CC1	;and bottom, right.	| DIWSTOP - 11.457
-	DC.W $92,$38	;Standard bitplane dma fetch start
-	DC.W $94,$D0	;and stop for standard screen.
+	DC.W $8E,$3061	;238h display window top, left | DIWSTRT - 11.393
+	DC.W $90,$16D1	;and bottom, right.	| DIWSTOP - 11.457
+	DC.W $92,$28	;Standard bitplane dma fetch start
+	DC.W $94,$D8	;and stop for standard screen.
 
 	DC.W $106,$0C00	;(AGA compat. if any Dual Playf. mode)
 	DC.W $108,0	;bwid-bpl	;modulos
@@ -491,7 +491,7 @@ COPPER:
 	DC.W $F2,0
 	DC.W $F4,0
 	DC.W $F6,0		;full 6 ptrs, in case you increase bpls
-	DC.W $100,BPLS*$1000+$200	;enable bitplanes
+	DC.W $100,bpls*$1000+$200	;enable bitplanes
 
 	SpritePointers:
 	DC.W $120,0,$122,0	; 0
