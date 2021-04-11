@@ -20,7 +20,7 @@ Z_Shift=PXLSIDE*5/2	; 5x5 obj
 LOGOSIDE=16*6
 LOGOBPL=LOGOSIDE=16/16*2
 ;*************
-MODSTART_POS=1		; start music at position # !! MUST BE EVEN FOR 16BIT
+MODSTART_POS=0		; start music at position # !! MUST BE EVEN FOR 16BIT
 ;*************
 
 VarTimesTrig MACRO ;3 = 1 * 2, where 2 is cos(Angle)^(TrigShift*2) or sin(Angle)^(TrigShift*2)
@@ -116,12 +116,13 @@ Demo:				;a4=VBR, a6=Custom Registers Base addr
 	; #### CPU INTENSIVE TASKS BEFORE STARTING MUSIC
 
 	;---  Call P61_Init  ---
-	
-	;MOVE.W	#Z_Shift,D1
-	;MOVE.W	D1,D7
-	;LSL.W	#5,D1
-	;LSL.W	#3,D7
-	;ADD.W	D7,D1
+	MOVEM.L	D0-A6,-(SP)
+	LEA	MODULE,A0
+	SUB.L	A1,A1
+	SUB.L	A2,A2
+	MOVE.W	#MODSTART_POS,P61_InitPos	; TRACK START OFFSET
+	JSR	P61_Init
+	MOVEM.L (SP)+,D0-A6
 
 	MOVE.L	#COPPER,COP1LC	; ATTACH THE COPPER
 ;********************  main loop  ********************
@@ -146,6 +147,37 @@ MainLoop:
 
 	; do stuff here :)
 
+	; ## SONG POS RESETS ##
+	MOVE.W	P61_Pos,D6
+	MOVE.W	P61_DUMMY_POS,D5
+	CMP.W	D5,D6
+	BEQ.S	.dontReset
+	ADDQ.W	#1,P61_DUMMY_POS
+	ADDQ.W	#1,P61_LAST_POS
+	.dontReset:
+	; ## SONG POS RESETS ##
+
+	; ## SEQUENCER LEDS ##
+	MOVE	P61_SEQ_POS,D0
+	MOVE.W	P61_rowpos,D6
+	MOVE.W	P61_DUMMY_SEQPOS,D5
+	CMP.W	D5,D6
+	BEQ.S	.dontResetRowPos
+	CLR.W	$100		; DEBUG | w 0 100 2
+	MOVE.W	D6,P61_DUMMY_SEQPOS
+	ADDQ.W	#1,D0
+	AND.W	#15,D0
+	MOVE.W	D0,P61_SEQ_POS
+	.dontResetRowPos:
+	LEA	SEQ_POS_ON,A0
+	MOVE.B	(A0,D0.W),LED_ON\.HPOS
+	LEA	SEQ_POS_OFF,A0
+	MOVE.B	(A0,D0.W),LED_OFF\.HPOS
+	LEA	SEQ_POS_BIT,A0
+	MOVE.B	(A0,D0.W),LED_ON\.CTRL
+	MOVE.B	(A0,D0.W),LED_OFF\.CTRL
+	; ## SEQUENCER LEDS ##
+
 	; **** JOYSTICK TEST ****
 	MOVEM.W	$DFF00C,D0	; FROM EAB
 	ANDI.W	#$0303,D0
@@ -156,14 +188,12 @@ MainLoop:
 	BTST	#9,D0		; 9 LEFT
 	BEQ.S	.notLeft
 	;SUBI.W	#4,ANGLE
-	SUBI.B	#1,LED_ON\.HPOS
-	MOVE.B	#1,LED_ON\.CTRL
+	SUBI.W	#1,P61_SEQ_POS
 	.notLeft:
 	BTST	#1,D0		; 1 RIGHT
 	BEQ.S	.notRight
 	;ADDI.W	#4,ANGLE
-	ADDI.B	#1,LED_ON\.HPOS
-	MOVE.B	#0,LED_ON\.CTRL
+	ADDI.W	#1,P61_SEQ_POS
 	.notRight:
 	BTST	#10,D0		; 10 UP
 	BEQ.S	.notDown
@@ -174,8 +204,6 @@ MainLoop:
 	BEQ.S	.notUp
 	;ADDI.W	#2,Z_POS
 	;SUBI.B	#1,LED_ON\.VPOS
-	CLR.W	D0
-	MOVE.B	LED_ON\.HPOS,D0
 	;CLR.W	$100		; DEBUG | w 0 100 2
 	.notUp:
 	; **** JOYSTICK TEST ****
@@ -287,6 +315,9 @@ MainLoop:
 	BNE.W	MainLoop		; then loop
 	;*--- exit ---*
 	;    ---  Call P61_End  ---
+	MOVEM.L D0-A6,-(SP)
+	JSR P61_End
+	MOVEM.L (SP)+,D0-A6
 	RTS
 
 ;********** Demo Routines **********
@@ -314,7 +345,7 @@ VBint:				; Blank template VERTB interrupt
 	move.w	#$20,$DFF09C	; KONEY REFACTOR
 	.notvb:	
 	rte
-ClearBuffer:				; by KONEY
+ClearBuffer:			; by KONEY
 	bsr	WaitBlitter
 	clr.w	BLTDMOD			; destination modulo
 	move.l	#$01000000,BLTCON0		; set operation type in BLTCON0/1
@@ -481,6 +512,11 @@ __ROTATE:
 ;********** Fastmem Data **********
 	INCLUDE	"sincosin_table.i"	; VALUES
 
+P61_LAST_POS:	DC.W MODSTART_POS
+P61_DUMMY_POS:	DC.W 0
+P61_FRAMECOUNT:	DC.W 0
+P61_SEQ_POS:	DC.W 0
+P61_DUMMY_SEQPOS:	DC.W 63
 ANGLE:		DC.W 0
 Z_POS:		DC.W 12
 Z_FACT:		DC.W 0
@@ -507,11 +543,9 @@ KONEY_OPT:	; OPTIMIZED
 	DC.W 2,5,0,5
 	DC.W 0,5,0,0
 
-SEQ_POS_ON:
-	DC.B $47,$52,$5C,$65,$70,$7A,$85,$8F,$99,$A3,$AE,$B8,$C3,$CD,$D9,$E3
-SEQ_POS_BIT:
-	DC.B $1,$1,$0,$1,$0,$0,$1,$1,$0,$0,$1,$0,$1,$0,$1,$1
-SEQ_POS_FF:
+SEQ_POS_ON:	DC.B $00,$51,$5C,$65,$00,$7A,$84,$8E,$00,$A3,$AD,$B8,$00,$CD,$D8,$E2
+SEQ_POS_BIT:	DC.B $1,$1,$0,$1,$0,$0,$1,$1,$0,$0,$1,$0,$1,$0,$1,$1
+SEQ_POS_OFF:	DC.B $47,$00,$00,$00,$70,$00,$00,$00,$99,$00,$00,$00,$C2,$00,$00,$00
 
 BITPLANE_PTR:	DC.L BITPLANE	; bitplane azzerato lowres
 DrawBuffer:	DC.L SCREEN2	; pointers to buffers
@@ -520,6 +554,7 @@ ViewBuffer:	DC.L SCREEN1	; to be swapped
 	SECTION	ChipData,DATA_C	;declared data that must be in chipmem
 
 TR909:	INCBIN "TR-909_368x230x5.raw"
+MODULE:	INCBIN "mechmicrobes.P61"	; code $B000
 
 LED_ON:
 	.VPOS:
@@ -539,7 +574,7 @@ LED_OFF:
 	.VPOS:
 	DC.B $90	; Posizione verticale di inizio sprite (da $2c a $f2)
 	.HPOS:
-	DC.B $5A	; Posizione orizzontale di inizio sprite (da $40 a $d8)
+	DC.B $00	; Posizione orizzontale di inizio sprite (da $40 a $d8)
 	DC.B $00	; $50+13=$5d	; posizione verticale di fine sprite
 	.CTRL:
 	DC.B $00
@@ -564,14 +599,14 @@ COPPER:
 	DC.W $100,bpls*$1000+$200	; enable bitplanes
 
 	.Palette:
-	DC.W $0180,$0000,$0182,$0DDC,$0184,$0A98,$0186,$0ABA
-	DC.W $0188,$0E93,$018A,$0211,$018C,$0D61,$018E,$0898
-	DC.W $0190,$0EEE,$0192,$0FFE,$0194,$0CCC,$0196,$0EC8
-	DC.W $0198,$0BB9,$019A,$0EEE,$019C,$0DDD,$019E,$0888
+	DC.W $0180,$0000,$0182,$0BBC,$0184,$0A9A,$0186,$0AAB
+	DC.W $0188,$0E83,$018A,$0211,$018C,$0D61,$018E,$0898
+	DC.W $0190,$0CCD,$0192,$0FFE,$0194,$0CCC,$0196,$0E98
+	DC.W $0198,$0BBC,$019A,$0EEE,$019C,$0AAB,$019E,$0888
 	DC.W $01A0,$0853,$01A2,$0556,$01A4,$0777,$01A6,$0632
-	DC.W $01A8,$0DDD,$01AA,$0FFF,$01AC,$0CCB,$01AE,$0DDC
-	DC.W $01B0,$0223,$01B2,$0BBB,$01B4,$0676,$01B6,$0999
-	DC.W $01B8,$0AAA,$01BA,$0887,$01BC,$0B00,$01BE,$0F00
+	DC.W $01A8,$0DDD,$01AA,$0FFF,$01AC,$0AAA,$01AE,$0DDC
+	DC.W $01B0,$0223,$01B2,$0BBB,$01B4,$0778,$01B6,$0999
+	DC.W $01B8,$0AAA,$01BA,$0889,$01BC,$0B00,$01BE,$0F00
 
 	.BplPtrs:
 	DC.W $E0,0
