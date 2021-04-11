@@ -1,4 +1,3 @@
-;*** WWW.KONEY.ORG *******
 ;*** MiniStartup by Photon ***
 	INCDIR	"NAS:AMIGA/CODE/mechmicrobes_amiga/"
 	SECTION	"Code",CODE
@@ -17,8 +16,6 @@ MARGINY=(h/2)
 TrigShift=7
 PXLSIDE=16
 Z_Shift=PXLSIDE*5/2	; 5x5 obj
-LOGOSIDE=16*6
-LOGOBPL=LOGOSIDE=16/16*2
 ;*************
 MODSTART_POS=1		; start music at position # !! MUST BE EVEN FOR 16BIT
 ;*************
@@ -48,59 +45,9 @@ Demo:				;a4=VBR, a6=Custom Registers Base addr
 	;*--- start copper ---*
 	LEA	SCREEN1,A0
 	MOVEQ	#bpl,D0
-	LEA	COPPER\.BplPtrs+2,A1
+	LEA	BplPtrs+2,A1
 	MOVEQ	#bpls-1,D1
 	BSR.W	PokePtrs
-
-	; #### Point LOGO sprites
-	POINT_SPRITES:
-	LEA	COPPER\.SpritePointers,A1	; Puntatori in copperlist
-	MOVE.L	#0,D0		; sprite 0
-	MOVE.W	D0,6(A1)
-	SWAP	D0
-	MOVE.W	D0,2(A1)
-
-	ADDQ.W	#8,A1
-	MOVE.L	#0,D0	; sprite 1
-	MOVE.W	D0,6(A1)
-	SWAP	D0
-	MOVE.W	D0,2(A1)
-
-	ADDQ.W	#8,A1
-	MOVE.L	#0,D0	; sprite 2
-	MOVE.W	D0,6(A1)
-	SWAP	D0
-	MOVE.W	D0,2(A1)
-
-	ADDQ.W	#8,A1
-	MOVE.L	#0,D0	; sprite 3
-	MOVE.W	D0,6(A1)
-	SWAP	D0
-	MOVE.W	D0,2(A1)
-
-	ADDQ.W	#8,A1
-	MOVE.L	#0,D0	; sprite 4
-	MOVE.W	D0,6(A1)
-	SWAP	D0
-	MOVE.W	D0,2(A1)
-
-	ADDQ.W	#8,A1
-	MOVE.L	#0,D0	; sprite 5
-	MOVE.W	D0,6(A1)
-	SWAP	D0
-	MOVE.W	D0,2(A1)
-
-	ADDQ.W	#8,A1
-	MOVE.L	#LED_ON,D0	; sprite 6
-	MOVE.W	D0,6(A1)
-	SWAP	D0
-	MOVE.W	D0,2(A1)
-
-	ADDQ.W	#8,A1
-	MOVE.L	#LED_OFF,D0	; sprite 7
-	MOVE.W	D0,6(A1)
-	SWAP	D0
-	MOVE.W	D0,2(A1)
 
 	; #### CPU INTENSIVE TASKS BEFORE STARTING MUSIC
 	; ** POINTS TO COORDS **
@@ -123,7 +70,7 @@ Demo:				;a4=VBR, a6=Custom Registers Base addr
 	;LSL.W	#3,D7
 	;ADD.W	D7,D1
 
-	MOVE.L	#COPPER,COP1LC	; ATTACH THE COPPER
+	MOVE.L	#COPPER,$DFF080	; ATTACH THE COPPER
 ;********************  main loop  ********************
 MainLoop:
 	move.w	#$12c,d0		;No buffering, so wait until raster
@@ -135,14 +82,14 @@ MainLoop:
 	;*--- show one... ---*
 	move.l	a3,a0
 	move.l	#bpl*h,d0
-	lea	COPPER\.BplPtrs+2,a1
+	lea	BplPtrs+2,a1
 	moveq	#bpls-1,d1
 	bsr.w	PokePtrs
 	;*--- ...draw into the other(a2) ---*
 	move.l	a2,a1
-	;bsr	ClearBuffer2
+	bsr	ClearBuffer2
 	;MOVE.L	BITPLANE_PTR,DrawBuffer
-	MOVE.L	#TR909,DrawBuffer
+	;MOVE.L	#TR909,DrawBuffer
 
 	; do stuff here :)
 
@@ -155,30 +102,23 @@ MainLoop:
 	ADD.W	D1,D0
 	BTST	#9,D0		; 9 LEFT
 	BEQ.S	.notLeft
-	;SUBI.W	#4,ANGLE
-	SUBI.B	#1,LED_ON\.HPOS
-	MOVE.B	#1,LED_ON\.CTRL
+	SUBI.W	#4,ANGLE
 	.notLeft:
 	BTST	#1,D0		; 1 RIGHT
 	BEQ.S	.notRight
-	;ADDI.W	#4,ANGLE
-	ADDI.B	#1,LED_ON\.HPOS
-	MOVE.B	#0,LED_ON\.CTRL
+	ADDI.W	#4,ANGLE
 	.notRight:
 	BTST	#10,D0		; 10 UP
 	BEQ.S	.notDown
-	;SUBI.W	#2,Z_POS
-	;ADDI.B	#1,LED_ON\.VPOS
+	SUBI.W	#2,Z_POS
 	.notDown:
 	BTST	#2,D0		; 2 DOWN
 	BEQ.S	.notUp
-	;ADDI.W	#2,Z_POS
-	;SUBI.B	#1,LED_ON\.VPOS
-	CLR.W	D0
-	MOVE.B	LED_ON\.HPOS,D0
-	;CLR.W	$100		; DEBUG | w 0 100 2
+	ADDI.W	#2,Z_POS
 	.notUp:
 	; **** JOYSTICK TEST ****
+
+	;CLR.W	$100		; DEBUG | w 0 100 2
 
 	; **** ROTATION VALUES ****
 	MOVE.W	ANGLE,D2
@@ -206,7 +146,7 @@ MainLoop:
 	MOVE.W	D7,CENTER
 	; **** END VALUES ****
 
-	BSR.W	InitLine		; inizializza line-mode
+	bsr.w	InitLine		; inizializza line-mode
 	MOVE.W	#$FFFF,BLTBDAT	; BLTBDAT = pattern della linea!
 	;MOVE.B	$DFF006,BLTBDAT
 
@@ -482,12 +422,38 @@ __ROTATE:
 	INCLUDE	"sincosin_table.i"	; VALUES
 
 ANGLE:		DC.W 0
-Z_POS:		DC.W 12
-Z_FACT:		DC.W 0
-CENTER:		DC.W 0
+Z_POS:		DC.W 0
+Z_FACT:		DC.W Z_Shift
+CENTER:		DC.W Z_Shift
 X_TEMP:		DC.W 0
 Y_TEMP:		DC.W 0
 XY_INIT:		DC.W 0
+
+KONEY:	; ROTATED 90 DEG
+	DC.W 0,0,1,0
+	DC.W 1,0,1,1
+	DC.W 1,1,2,1
+	DC.W 2,1,2,2
+	DC.W 2,2,3,2
+	DC.W 3,2,3,1
+	DC.W 3,1,4,1
+	DC.W 4,1,4,0
+	DC.W 4,0,5,0
+	DC.W 5,0,5,1
+	DC.W 5,1,4,1
+	DC.W 4,1,4,2
+	DC.W 4,2,3,2
+	DC.W 3,2,3,3
+	DC.W 3,3,5,3
+	DC.W 5,3,5,5
+	DC.W 5,5,0,5
+	DC.W 0,5,0,4
+	DC.W 0,4,2,4
+	DC.W 2,4,2,2
+	DC.W 2,2,1,2
+	DC.W 1,2,1,1
+	DC.W 1,1,0,1
+	DC.W 0,1,0,0
 
 KONEY_OPT:	; OPTIMIZED
 	DC.W 0,0,1,0
@@ -507,12 +473,6 @@ KONEY_OPT:	; OPTIMIZED
 	DC.W 2,5,0,5
 	DC.W 0,5,0,0
 
-SEQ_POS_ON:
-	DC.B $47,$52,$5C,$65,$70,$7A,$85,$8F,$99,$A3,$AE,$B8,$C3,$CD,$D9,$E3
-SEQ_POS_BIT:
-	DC.B $1,$1,$0,$1,$0,$0,$1,$1,$0,$0,$1,$0,$1,$0,$1,$1
-SEQ_POS_FF:
-
 BITPLANE_PTR:	DC.L BITPLANE	; bitplane azzerato lowres
 DrawBuffer:	DC.L SCREEN2	; pointers to buffers
 ViewBuffer:	DC.L SCREEN1	; to be swapped
@@ -521,49 +481,20 @@ ViewBuffer:	DC.L SCREEN1	; to be swapped
 
 TR909:	INCBIN "TR-909_368x230x5.raw"
 
-LED_ON:
-	.VPOS:
-	DC.B $90	; Posizione verticale di inizio sprite (da $2c a $f2)
-	.HPOS:
-	DC.B $47	; Posizione orizzontale di inizio sprite (da $40 a $d8)
-	DC.B $00	; $50+13=$5d	; posizione verticale di fine sprite
-	.CTRL:
-	DC.B $00
-	DC.W $0000,$0000,$0000,$0000,$0000,$0000
-	DC.W $0000,$0000,$0000,$0000,$0000,$0000
-	DC.W $0000,$0000,$0000,$0000,$0000,$0000
-	DC.W $0000,$0000,$0000,$0000,$0000,$0000
-	DC.W $0000,$0000,$0000,$0000,$0000,$0000
-	DC.W 0,0	; 2 word azzerate definiscono la fine dello sprite.
-LED_OFF:	
-	.VPOS:
-	DC.B $90	; Posizione verticale di inizio sprite (da $2c a $f2)
-	.HPOS:
-	DC.B $5A	; Posizione orizzontale di inizio sprite (da $40 a $d8)
-	DC.B $00	; $50+13=$5d	; posizione verticale di fine sprite
-	.CTRL:
-	DC.B $00
-	DC.W $0000,$0000,$0000,$0000,$0000,$0000
-	DC.W $0000,$0000,$0000,$0000,$0000,$0000
-	DC.W $0000,$0000,$0000,$0000,$0000,$0000
-	DC.W $0000,$0000,$0000,$0000,$0000,$0000
-	DC.W $0000,$0000,$0000,$0000,$0000,$0000
-	DC.W 0,0	; 2 word azzerate definiscono la fine dello sprite.
-
 COPPER:
-	DC.W $1FC,0		; Slow fetch mode, remove if AGA demo.
-	DC.W $8E,$3061		; 238h display window top, left | DIWSTRT - 11.393
-	DC.W $90,$16D1		; and bottom, right.	| DIWSTOP - 11.457
-	DC.W $92,$28		; Standard bitplane dma fetch start
-	DC.W $94,$D8		; and stop eab.abime.net/showthread.php?t=69926
-	DC.W $106,$0C00		; (AGA compat. if any Dual Playf. mode)
-	DC.W $108,0		; bwid-bpl	;modulos
-	DC.W $10A,0		; bwid-bpl	;RISULTATO = 80 ?
-	DC.W $102,0		; SCROLL REGISTER (AND PLAYFIELD PRI)
-	DC.W $104,%0000000000100100	; BPLCON2
-	DC.W $100,bpls*$1000+$200	; enable bitplanes
+	DC.W $1FC,0	; Slow fetch mode, remove if AGA demo.
+	DC.W $8E,$3061	; 238h display window top, left | DIWSTRT - 11.393
+	DC.W $90,$16D1	; and bottom, right.	| DIWSTOP - 11.457
+	DC.W $92,$28	; Standard bitplane dma fetch start
+	DC.W $94,$D8	; and stop eab.abime.net/showthread.php?t=69926
 
-	.Palette:
+	DC.W $106,$0C00	; (AGA compat. if any Dual Playf. mode)
+	DC.W $108,0	; bwid-bpl	;modulos
+	DC.W $10A,0	; bwid-bpl	;RISULTATO = 80 ?
+
+	DC.W $102,0	; SCROLL REGISTER (AND PLAYFIELD PRI)
+
+	Palette:
 	DC.W $0180,$0000,$0182,$0DDC,$0184,$0A98,$0186,$0ABA
 	DC.W $0188,$0E93,$018A,$0211,$018C,$0D61,$018E,$0898
 	DC.W $0190,$0EEE,$0192,$0FFE,$0194,$0CCC,$0196,$0EC8
@@ -573,7 +504,7 @@ COPPER:
 	DC.W $01B0,$0223,$01B2,$0BBB,$01B4,$0676,$01B6,$0999
 	DC.W $01B8,$0AAA,$01BA,$0887,$01BC,$0B00,$01BE,$0F00
 
-	.BplPtrs:
+	BplPtrs:
 	DC.W $E0,0
 	DC.W $E2,0
 	DC.W $E4,0
@@ -585,29 +516,20 @@ COPPER:
 	DC.W $F0,0
 	DC.W $F2,0
 	DC.W $F4,0
-	DC.W $F6,0	; full 6 ptrs, in case you increase bpls
+	DC.W $F6,0		;full 6 ptrs, in case you increase bpls
+	DC.W $100,bpls*$1000+$200	;enable bitplanes
 
-	.SpritePointers:
-	DC.W $120,0,$122,0 ; 0
-	DC.W $124,0,$126,0 ; 1
-	DC.W $128,0,$12A,0 ; 2
-	DC.W $12C,0,$12E,0 ; 3
-	DC.W $130,0,$132,0 ; 4
-	DC.W $134,0,$136,0 ; 5
-	DC.W $138,0,$13A,0 ; 6
-	DC.W $13C,0,$13E,0 ; 7
+	SpritePointers:
+	DC.W $120,0,$122,0	; 0
+	DC.W $124,0,$126,0	; 1
+	DC.W $128,0,$12A,0	; 2
+	DC.W $12C,0,$12E,0	; 3
+	DC.W $130,0,$132,0	; 4
+	DC.W $134,0,$136,0	; 5
+	DC.W $138,0,$13A,0	; 6
+	DC.W $13C,0,$13E,0	; 7
 
-	; **** COPPERWAITS ****
-
-	.SEQ_LED:
-	DC.W $F801,$FF00	; horizontal position masked off
-	DC.W $174,$FC00,$176,$FC00	; SPR6DATA
-	DC.W $17C,$0000,$17E,$FC00	; SPR7DATA
-	DC.W $FA01,$FF00
-	DC.W $174,$0000,$176,$0000	; SPR6DATA
-	DC.W $17C,$0000,$17E,$0000	; SPR7DATA
-
-
+	COPPERWAITS:
 	DC.W $FFDF,$FFFE	; allow VPOS>$ff
 
 	DC.W $FFFF,$FFFE	;magic value to end copperlist
