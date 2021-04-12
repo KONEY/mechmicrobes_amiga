@@ -654,8 +654,9 @@ _COPPER:
 	SECTION	ChipBuffers,BSS_C	;BSS doesn't count toward exe size
 ;*******************************************************************************
 
-BITPLANE:		DS.B h*bwid	; bitplane azzerato lowres
-EMPTY:		DS.B h*bpl
+BITPLANE:		DS.B LOGOSIDE*LOGOBPL	; bitplane azzerato lowres
+DUMMY:		DS.B DSh*bwid
+EMPTY:		DS.B LOGOSIDE*LOGOBPLl
 SCREEN1:		DS.B h*bwid	; Define storage for buffer 1
 SCREEN2:		DS.B h*bwid	; two buffers
 
