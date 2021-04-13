@@ -19,8 +19,7 @@ PXLSIDE=16
 Z_Shift=PXLSIDE*5/2	; 5x5 obj
 LOGOSIDE=16*4
 LOGOBPL=LOGOSIDE=16/16*2
-LOGOMARGINX=(LOGOSIDE/2)
-LOGOMARGINY=(LOGOSIDE/2)
+
 ;*************
 MODSTART_POS=0		; start music at position # !! MUST BE EVEN FOR 16BIT
 ;*************
@@ -143,9 +142,9 @@ MainLoop:
 	bsr.w	PokePtrs
 	;*--- ...draw into the other(a2) ---*
 	move.l	a2,a1
-	;bsr	ClearBuffer2
-	;MOVE.L	BITPLANE_PTR,DrawBuffer
-	MOVE.L	#TR909,DrawBuffer
+	bsr	ClearBuffer2
+	MOVE.L	BITPLANE_PTR,DrawBuffer
+	;MOVE.L	#TR909,DrawBuffer
 
 	; do stuff here :)
 
@@ -189,12 +188,12 @@ MainLoop:
 	ADD.W	D1,D0
 	BTST	#9,D0		; 9 LEFT
 	BEQ.S	.notLeft
-	;SUBI.W	#4,ANGLE
+	SUBI.W	#2,ANGLE
 	SUBI.W	#1,P61_SEQ_POS
 	.notLeft:
 	BTST	#1,D0		; 1 RIGHT
 	BEQ.S	.notRight
-	;ADDI.W	#4,ANGLE
+	ADDI.W	#2,ANGLE
 	ADDI.W	#1,P61_SEQ_POS
 	.notRight:
 	BTST	#10,D0		; 10 UP
@@ -301,10 +300,12 @@ MainLoop:
 
 	MOVEM.L	(SP)+,D0-D1
 
-	;BSR.W	Drawline
+	BSR.W	Drawline
 
 	MOVEM.L	(SP)+,D7
 	DBRA	D7,.fetchCoordz
+
+	ADDI.W	#2,ANGLE
 
 	;*--- main loop end ---*
 
@@ -361,7 +362,7 @@ ClearBuffer2:
 	MOVE.L	#0,BLTAMOD		; Init modulo Sou. A
 	;MOVE.W	#0,BLTDMOD		; Init modulo Dest D
 	MOVE.L	#Empty,BLTAPTH		; Source
-	MOVE.L	DrawBuffer,BLTDPTH		; Dest
+	MOVE.L	BITPLANE_PTR,BLTDPTH		; Dest
 	MOVE.W	#(h*64)+(w/16),BLTSIZE	; Start Blitter (Blitsize)
 	RTS
 
@@ -377,7 +378,7 @@ ClearBuffer2:
 
 Drawline:
 	;LEA	BITPLANE,A0
-	MOVE.L	DrawBuffer,A0
+	MOVE.L	BITPLANE_PTR,A0
 	ADDI.W	#MARGINX,D0
 	ADDI.W	#MARGINY,D1
 	ADDI.W	#MARGINX,D2
@@ -654,9 +655,8 @@ _COPPER:
 	SECTION	ChipBuffers,BSS_C	;BSS doesn't count toward exe size
 ;*******************************************************************************
 
-BITPLANE:		DS.B LOGOSIDE*LOGOBPL	; bitplane azzerato lowres
-DUMMY:		DS.B DSh*bwid
-EMPTY:		DS.B LOGOSIDE*LOGOBPLl
+BITPLANE:		DS.B h*bwid	; bitplane azzerato lowres
+EMPTY:		DS.B h*bpl
 SCREEN1:		DS.B h*bwid	; Define storage for buffer 1
 SCREEN2:		DS.B h*bwid	; two buffers
 
