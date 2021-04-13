@@ -13,13 +13,12 @@ bpls=5		;handy values:
 bpl=w/16*2	;byte-width of 1 bitplane line (40)
 bwid=bpls*bpl	;byte-width of 1 pixel line (all bpls)
 MARGINX=(w/2)
-MARGINY=(h/2)
 TrigShift=7
 PXLSIDE=16
 Z_Shift=PXLSIDE*5/2	; 5x5 obj
-LOGOSIDE=16*4
+LOGOSIDE=16*6
 LOGOBPL=LOGOSIDE=16/16*2
-
+MARGINY=(LOGOSIDE/2)
 ;*************
 MODSTART_POS=0		; start music at position # !! MUST BE EVEN FOR 16BIT
 ;*************
@@ -42,9 +41,9 @@ Demo:				;a4=VBR, a6=Custom Registers Base addr
 	MOVE.W	#%1000011111100000,DMACON
 	;*--- clear screens ---*
 	LEA	SCREEN1,A1
-	BSR.W	ClearScreen
+	;BSR.W	ClearScreen
 	LEA	SCREEN2,A1
-	BSR.W	ClearScreen
+	;BSR.W	ClearScreen
 	BSR	WaitBlitter
 	;*--- start copper ---*
 	LEA	SCREEN1,A0
@@ -143,8 +142,8 @@ MainLoop:
 	;*--- ...draw into the other(a2) ---*
 	move.l	a2,a1
 	bsr	ClearBuffer2
-	MOVE.L	BITPLANE_PTR,DrawBuffer
-	;MOVE.L	#TR909,DrawBuffer
+	;MOVE.L	BITPLANE_PTR,DrawBuffer
+	MOVE.L	#TR909,DrawBuffer
 
 	; do stuff here :)
 
@@ -189,22 +188,18 @@ MainLoop:
 	BTST	#9,D0		; 9 LEFT
 	BEQ.S	.notLeft
 	SUBI.W	#2,ANGLE
-	SUBI.W	#1,P61_SEQ_POS
 	.notLeft:
 	BTST	#1,D0		; 1 RIGHT
 	BEQ.S	.notRight
 	ADDI.W	#2,ANGLE
-	ADDI.W	#1,P61_SEQ_POS
 	.notRight:
 	BTST	#10,D0		; 10 UP
 	BEQ.S	.notDown
-	;SUBI.W	#2,Z_POS
-	;ADDI.B	#1,LED_ON\.VPOS
+	SUBI.W	#2,Z_POS
 	.notDown:
 	BTST	#2,D0		; 2 DOWN
 	BEQ.S	.notUp
-	;ADDI.W	#2,Z_POS
-	;SUBI.B	#1,LED_ON\.VPOS
+	ADDI.W	#2,Z_POS
 	;CLR.W	$100		; DEBUG | w 0 100 2
 	.notUp:
 	; **** JOYSTICK TEST ****
@@ -352,8 +347,8 @@ ClearBuffer:			; by KONEY
 	bsr	WaitBlitter
 	clr.w	BLTDMOD			; destination modulo
 	move.l	#$01000000,BLTCON0		; set operation type in BLTCON0/1
-	move.l	DrawBuffer,BLTDPTH		; destination address
-	MOVE.W	#(h*64)+(w/16),BLTSIZE	; Start Blitter (Blitsize)
+	move.l	BITPLANE_PTR,BLTDPTH		; destination address
+	MOVE.W	#LOGOSIDE*bpls*64+bpl/2,BLTSIZE	; Start Blitter (Blitsize)
 	rts
 ClearBuffer2:
 	bsr	WaitBlitter
@@ -363,7 +358,7 @@ ClearBuffer2:
 	;MOVE.W	#0,BLTDMOD		; Init modulo Dest D
 	MOVE.L	#Empty,BLTAPTH		; Source
 	MOVE.L	BITPLANE_PTR,BLTDPTH		; Dest
-	MOVE.W	#(h*64)+(w/16),BLTSIZE	; Start Blitter (Blitsize)
+	MOVE.W	#(LOGOSIDE*64)+(w/16),BLTSIZE	; Start Blitter (Blitsize)
 	RTS
 
 ;******************************************************************************
@@ -550,7 +545,7 @@ SEQ_POS_ON:	DC.B $00,$51,$5C,$65,$00,$7A,$84,$8E,$00,$A3,$AD,$B8,$00,$CD,$D8,$E2
 SEQ_POS_BIT:	DC.B $1,$1,$0,$1,$0,$0,$1,$1,$0,$0,$1,$0,$1,$0,$1,$1
 SEQ_POS_OFF:	DC.B $47,$00,$00,$00,$70,$00,$00,$00,$99,$00,$00,$00,$C2,$00,$00,$00
 
-BITPLANE_PTR:	DC.L BITPLANE	; bitplane azzerato lowres
+BITPLANE_PTR:	DC.L TR909+(h*bpl*4)	; bitplane azzerato lowres
 DrawBuffer:	DC.L SCREEN2	; pointers to buffers
 ViewBuffer:	DC.L SCREEN1	; to be swapped
 
@@ -655,8 +650,8 @@ _COPPER:
 	SECTION	ChipBuffers,BSS_C	;BSS doesn't count toward exe size
 ;*******************************************************************************
 
-BITPLANE:		DS.B h*bwid	; bitplane azzerato lowres
-EMPTY:		DS.B h*bpl
+BITPLANE:		DS.B LOGOSIDE*bwid	; bitplane azzerato lowres
+EMPTY:		DS.B LOGOSIDE*bpl
 SCREEN1:		DS.B h*bwid	; Define storage for buffer 1
 SCREEN2:		DS.B h*bwid	; two buffers
 
