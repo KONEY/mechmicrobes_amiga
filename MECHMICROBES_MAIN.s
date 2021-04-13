@@ -12,12 +12,12 @@ h=230
 bpls=5		;handy values:
 bpl=w/16*2	;byte-width of 1 bitplane line (40)
 bwid=bpls*bpl	;byte-width of 1 pixel line (all bpls)
-MARGINX=(w/2)
 TrigShift=7
 PXLSIDE=16
 Z_Shift=PXLSIDE*5/2	; 5x5 obj
 LOGOSIDE=16*6
-LOGOBPL=LOGOSIDE=16/16*2
+LOGOBPL=LOGOSIDE/16*2
+MARGINX=(LOGOSIDE/2)
 MARGINY=(LOGOSIDE/2)
 ;*************
 MODSTART_POS=0		; start music at position # !! MUST BE EVEN FOR 16BIT
@@ -354,11 +354,11 @@ ClearBuffer2:
 	bsr	WaitBlitter
 	MOVE.W	#$09f0,BLTCON0		; A**,Shift 0, A -> D
 	MOVE.W	#0,BLTCON1		; Everything Normal
-	MOVE.L	#0,BLTAMOD		; Init modulo Sou. A
-	;MOVE.W	#0,BLTDMOD		; Init modulo Dest D
+	MOVE.W	#0,BLTAMOD		; Init modulo Sou. A
+	MOVE.W	#bpl-LOGOBPL,BLTDMOD	; Init modulo Dest D
 	MOVE.L	#Empty,BLTAPTH		; Source
 	MOVE.L	BITPLANE_PTR,BLTDPTH		; Dest
-	MOVE.W	#(LOGOSIDE*64)+(w/16),BLTSIZE	; Start Blitter (Blitsize)
+	MOVE.W	#(LOGOSIDE*64)+(LOGOSIDE/16),BLTSIZE	; Start Blitter (Blitsize)
 	RTS
 
 ;******************************************************************************
@@ -545,7 +545,7 @@ SEQ_POS_ON:	DC.B $00,$51,$5C,$65,$00,$7A,$84,$8E,$00,$A3,$AD,$B8,$00,$CD,$D8,$E2
 SEQ_POS_BIT:	DC.B $1,$1,$0,$1,$0,$0,$1,$1,$0,$0,$1,$0,$1,$0,$1,$1
 SEQ_POS_OFF:	DC.B $47,$00,$00,$00,$70,$00,$00,$00,$99,$00,$00,$00,$C2,$00,$00,$00
 
-BITPLANE_PTR:	DC.L TR909+(h*bpl*4)	; bitplane azzerato lowres
+BITPLANE_PTR:	DC.L TR909	;+(h*bpl*4)	; bitplane azzerato lowres
 DrawBuffer:	DC.L SCREEN2	; pointers to buffers
 ViewBuffer:	DC.L SCREEN1	; to be swapped
 
@@ -597,14 +597,14 @@ COPPER:
 	DC.W $100,bpls*$1000+$200	; enable bitplanes
 
 	.Palette:
-	DC.W $0180,$0000,$0182,$0CCC,$0184,$0BBC,$0186,$099A
-	DC.W $0188,$0889,$018A,$0778,$018C,$0667,$018E,$0556
-	DC.W $0190,$0FFF,$0192,$0EEE,$0194,$0DDD,$0196,$0CCD
-	DC.W $0198,$0BBB,$019A,$0AAA,$019C,$0999,$019E,$0888
-	DC.W $01A0,$0777,$01A2,$0666,$01A4,$0555,$01A6,$0444
-	DC.W $01A8,$0222,$01AA,$0DDE,$01AC,$0AAB,$01AE,$0EEF
-	DC.W $01B0,$0CBB,$01B2,$0CA9,$01B4,$0E98,$01B6,$0D61
-	DC.W $01B8,$0853,$01BA,$0B00,$01BC,$0632,$01BE,$0F00
+	DC.W	$0180,$0000,$0182,$00F0,$0184,$0FF0,$0186,$00FF
+	DC.W	$0188,$0D88,$018A,$0667,$018C,$0556,$018E,$0FFF
+	DC.W	$0190,$0EEE,$0192,$0DDD,$0194,$0CCD,$0196,$0BBB
+	DC.W	$0198,$0AAA,$019A,$0999,$019C,$0888,$019E,$0777
+	DC.W	$01A0,$0555,$01A2,$0444,$01A4,$0CCC,$01A6,$0EEF
+	DC.W	$01A8,$0BBC,$01AA,$099A,$01AC,$0D61,$01AE,$0D61
+	DC.W	$01B0,$0CBA,$01B2,$0CA9,$01B4,$0778,$01B6,$0889
+	DC.W	$01B8,$0853,$01BA,$0B00,$01BC,$0632,$01BE,$0F00
 
 	.BplPtrs:
 	DC.W $E0,0
