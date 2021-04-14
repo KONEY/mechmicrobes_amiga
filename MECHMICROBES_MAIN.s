@@ -300,8 +300,9 @@ MainLoop:
 	MOVEM.L	(SP)+,D7
 	DBRA	D7,.fetchCoordz
 
-	ADDI.W	#2,ANGLE
+	BSR.W	__BLIT_3D_IN_PLACE
 
+	ADDI.W	#2,ANGLE
 	;*--- main loop end ---*
 
 	ENDING_CODE:
@@ -354,10 +355,10 @@ ClearBuffer2:
 	bsr	WaitBlitter
 	MOVE.W	#$09f0,BLTCON0		; A**,Shift 0, A -> D
 	MOVE.W	#0,BLTCON1		; Everything Normal
-	MOVE.W	#0,BLTAMOD		; Init modulo Sou. A
+	MOVE.L	#0,BLTAMOD		; Init modulo Sou. A
 	MOVE.W	#bpl-LOGOBPL,BLTDMOD	; Init modulo Dest D
-	MOVE.L	#Empty,BLTAPTH		; Source
-	MOVE.L	BITPLANE_PTR,BLTDPTH		; Dest
+	MOVE.L	#EMPTY,BLTAPTH		; Source
+	MOVE.L	#BUFFER3D,BLTDPTH		; Dest
 	MOVE.W	#(LOGOSIDE*64)+(LOGOSIDE/16),BLTSIZE	; Start Blitter (Blitsize)
 	RTS
 
@@ -372,8 +373,8 @@ ClearBuffer2:
 ;******************************************************************************
 
 Drawline:
-	;LEA	BITPLANE,A0
-	MOVE.L	BITPLANE_PTR,A0
+	LEA	BUFFER3D,A0
+	;MOVE.L	BITPLANE_PTR,A0
 	ADDI.W	#MARGINX,D0
 	ADDI.W	#MARGINY,D1
 	ADDI.W	#MARGINX,D2
@@ -505,6 +506,20 @@ __ROTATE:
 	move.l	d5,d1		;rotatedY = left + right
 	add.l	d6,d1
 	move.l	d7,d0		;rotatedX = tmp
+	RTS
+
+__BLIT_3D_IN_PLACE:
+	bsr	WaitBlitter
+	MOVE.L	BITPLANE_PTR,BLTDPTH
+	MOVE.W	#$FFFF,BLTAFWM		; BLTAFWM lo spiegheremo dopo
+	MOVE.W	#$FFFF,BLTALWM		; BLTALWM lo spiegheremo dopo
+	MOVE.W	#$09F0,BLTCON0		; BLTCON0 (usa A+D)
+	MOVE.W	#%0000000000000000,BLTCON1	; BLTCON1 lo spiegheremo dopo
+	MOVE.W	#bpl-LOGOBPL,BLTAMOD		; BLTAMOD =0 perche` il rettangolo
+;+(bpl/2)-(LOGOBPL/2)
+	MOVE.W	#bpl-LOGOBPL,BLTDMOD	; Init modulo Dest D
+	MOVE.L	#BUFFER3D,BLTAPTH		; BLTAPT  (fisso alla figura sorgente)
+	MOVE.W	#(LOGOSIDE*64)+(LOGOSIDE/16),BLTSIZE	; Start Blitter (Blitsize)
 	RTS
 
 ;********** Fastmem Data **********
@@ -650,8 +665,8 @@ _COPPER:
 	SECTION	ChipBuffers,BSS_C	;BSS doesn't count toward exe size
 ;*******************************************************************************
 
-BITPLANE:		DS.B LOGOSIDE*bwid	; bitplane azzerato lowres
-EMPTY:		DS.B LOGOSIDE*bpl
+BUFFER3D:		DS.B LOGOSIDE*bwid	; bigger to hold zoom
+EMPTY:		DS.B LOGOSIDE*bpl	; clear buffer
 SCREEN1:		DS.B h*bwid	; Define storage for buffer 1
 SCREEN2:		DS.B h*bwid	; two buffers
 
