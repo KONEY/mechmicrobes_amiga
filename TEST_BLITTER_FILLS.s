@@ -12,13 +12,13 @@ h=230
 bpls=5		;handy values:
 bpl=w/16*2	;byte-width of 1 bitplane line (40)
 bwid=bpls*bpl	;byte-width of 1 pixel line (all bpls)
+MARGINX=(w/2)
+MARGINY=(h/2)
 TrigShift=7
 PXLSIDE=16
 Z_Shift=PXLSIDE*5/2	; 5x5 obj
-LOGOSIDE=16*7
-LOGOBPL=LOGOSIDE/16*2
-MARGINX=(w/2)
-MARGINY=(LOGOSIDE/2)-3
+LOGOSIDE=16*6
+LOGOBPL=LOGOSIDE=16/16*2
 ;*************
 MODSTART_POS=0		; start music at position # !! MUST BE EVEN FOR 16BIT
 ;*************
@@ -41,9 +41,9 @@ Demo:				;a4=VBR, a6=Custom Registers Base addr
 	MOVE.W	#%1000011111100000,DMACON
 	;*--- clear screens ---*
 	LEA	SCREEN1,A1
-	;BSR.W	ClearScreen
+	BSR.W	ClearScreen
 	LEA	SCREEN2,A1
-	;BSR.W	ClearScreen
+	BSR.W	ClearScreen
 	BSR	WaitBlitter
 	;*--- start copper ---*
 	LEA	SCREEN1,A0
@@ -142,8 +142,8 @@ MainLoop:
 	;*--- ...draw into the other(a2) ---*
 	move.l	a2,a1
 	bsr	ClearBuffer2
-	;MOVE.L	#BUFFER3D,DrawBuffer
-	MOVE.L	#TR909,DrawBuffer
+	MOVE.L	BITPLANE_PTR,DrawBuffer
+	;MOVE.L	#TR909,DrawBuffer
 
 	; do stuff here :)
 
@@ -157,21 +157,26 @@ MainLoop:
 	.dontReset:
 	; ## SONG POS RESETS ##
 
-	;CLR.W	$100		; DEBUG | w 0 100 2
-	.notFirstBlock:
-	LEA	(PC),A2
-	MOVE.W	P61_LAST_POS,D0
-	CMPI	#0,D0
-	BEQ.S	.dontStartSequencer
-	LEA	.skipCMP,A1
-	SUB.W	A2,A1
-	MOVE.W	A1,D0
-	EOR.W	#$6000,D0	; BRA.S	.skipCMP
-	LEA	.notFirstBlock,A0
-	MOVE.W	D0,(A0)
-	.skipCMP:
-	BSR.W	__SET_SEQUENCER_LEDS
-	.dontStartSequencer:
+	; ## SEQUENCER LEDS ##
+	MOVE	P61_SEQ_POS,D0
+	MOVE.W	P61_rowpos,D6
+	MOVE.W	P61_DUMMY_SEQPOS,D5
+	CMP.W	D5,D6
+	BEQ.S	.dontResetRowPos
+	CLR.W	$100		; DEBUG | w 0 100 2
+	MOVE.W	D6,P61_DUMMY_SEQPOS
+	ADDQ.W	#1,D0
+	AND.W	#15,D0
+	MOVE.W	D0,P61_SEQ_POS
+	.dontResetRowPos:
+	LEA	SEQ_POS_ON,A0
+	MOVE.B	(A0,D0.W),LED_ON\.HPOS
+	LEA	SEQ_POS_OFF,A0
+	MOVE.B	(A0,D0.W),LED_OFF\.HPOS
+	LEA	SEQ_POS_BIT,A0
+	MOVE.B	(A0,D0.W),LED_ON\.CTRL
+	MOVE.B	(A0,D0.W),LED_OFF\.CTRL
+	; ## SEQUENCER LEDS ##
 
 	; **** JOYSTICK TEST ****
 	MOVEM.W	$DFF00C,D0	; FROM EAB
@@ -182,19 +187,24 @@ MainLoop:
 	ADD.W	D1,D0
 	BTST	#9,D0		; 9 LEFT
 	BEQ.S	.notLeft
-	SUBI.W	#2,ANGLE
+	;SUBI.W	#4,ANGLE
+	SUBI.W	#1,P61_SEQ_POS
 	.notLeft:
 	BTST	#1,D0		; 1 RIGHT
 	BEQ.S	.notRight
-	ADDI.W	#2,ANGLE
+	;ADDI.W	#4,ANGLE
+	ADDI.W	#1,P61_SEQ_POS
 	.notRight:
 	BTST	#10,D0		; 10 UP
 	BEQ.S	.notDown
-	SUBI.W	#2,Z_POS
+	;SUBI.W	#2,Z_POS
+	;ADDI.B	#1,LED_ON\.VPOS
 	.notDown:
 	BTST	#2,D0		; 2 DOWN
 	BEQ.S	.notUp
-	ADDI.W	#2,Z_POS
+	;ADDI.W	#2,Z_POS
+	;SUBI.B	#1,LED_ON\.VPOS
+	;CLR.W	$100		; DEBUG | w 0 100 2
 	.notUp:
 	; **** JOYSTICK TEST ****
 
@@ -294,9 +304,6 @@ MainLoop:
 	MOVEM.L	(SP)+,D7
 	DBRA	D7,.fetchCoordz
 
-	BSR.W	__BLIT_3D_IN_PLACE
-
-	ADDI.W	#2,ANGLE
 	;*--- main loop end ---*
 
 	ENDING_CODE:
@@ -342,18 +349,18 @@ ClearBuffer:			; by KONEY
 	bsr	WaitBlitter
 	clr.w	BLTDMOD			; destination modulo
 	move.l	#$01000000,BLTCON0		; set operation type in BLTCON0/1
-	move.l	BITPLANE_PTR,BLTDPTH		; destination address
-	MOVE.W	#LOGOSIDE*bpls*64+bpl/2,BLTSIZE	; Start Blitter (Blitsize)
+	move.l	DrawBuffer,BLTDPTH		; destination address
+	MOVE.W	#(h*64)+(w/16),BLTSIZE	; Start Blitter (Blitsize)
 	rts
 ClearBuffer2:
 	bsr	WaitBlitter
 	MOVE.W	#$09f0,BLTCON0		; A**,Shift 0, A -> D
 	MOVE.W	#0,BLTCON1		; Everything Normal
 	MOVE.L	#0,BLTAMOD		; Init modulo Sou. A
-	MOVE.W	#0,BLTDMOD		; Init modulo Dest D
-	MOVE.L	#EMPTY,BLTAPTH		; Source
-	MOVE.L	#BUFFER3D,BLTDPTH		; Dest
-	MOVE.W	#(w*64)+(LOGOSIDE/16),BLTSIZE	; Start Blitter (Blitsize)
+	;MOVE.W	#0,BLTDMOD		; Init modulo Dest D
+	MOVE.L	#Empty,BLTAPTH		; Source
+	MOVE.L	DrawBuffer,BLTDPTH		; Dest
+	MOVE.W	#(h*64)+(w/16),BLTSIZE	; Start Blitter (Blitsize)
 	RTS
 
 ;******************************************************************************
@@ -367,8 +374,8 @@ ClearBuffer2:
 ;******************************************************************************
 
 Drawline:
-	LEA	BUFFER3D,A0
-	;MOVE.L	BITPLANE_PTR,A0
+	;LEA	BITPLANE,A0
+	MOVE.L	DrawBuffer,A0
 	ADDI.W	#MARGINX,D0
 	ADDI.W	#MARGINY,D1
 	ADDI.W	#MARGINX,D2
@@ -502,51 +509,6 @@ __ROTATE:
 	move.l	d7,d0		;rotatedX = tmp
 	RTS
 
-__BLIT_3D_IN_PLACE:
-	bsr	WaitBlitter
-	MOVE.W	#$FFFF,BLTAFWM			; BLTAFWM lo spiegheremo dopo
-	MOVE.W	#$FFFF,BLTALWM			; BLTALWM lo spiegheremo dopo
-	MOVE.W	#%0000100111110000,BLTCON0		; BLTCON0 (usa A+D)
-	;MOVE.W	#%0000000000001010,BLTCON1		; BLTCON1 lo spiegheremo dopo
-	MOVE.W	#%0000000000000000,BLTCON1		; BLTCON1 lo spiegheremo dopo
-	MOVE.W	#bpl-LOGOBPL,BLTAMOD		; BLTAMOD =0 perche` il rettangolo
-	MOVE.W	#bpl-LOGOBPL,BLTDMOD		; Init modulo Dest D
-	MOVE.L	#BUFFER3D+((bpl/2)-(LOGOBPL/2)),BLTAPTH	; BLTAPT  (fisso alla figura sorgente)
-	MOVE.L	BITPLANE_PTR,A4
-	ADD.L	#((bpl/2)-(LOGOBPL/2)),A4
-	MOVE.L	A4,BLTDPTH
-	MOVE.W	#(LOGOSIDE*64)+(LOGOSIDE/16),BLTSIZE	; Start Blitter (Blitsize)
-	RTS
-
-__SET_SEQUENCER_LEDS:
-	; ## SEQUENCER LEDS ##
-	MOVE	P61_SEQ_POS,D0
-	MOVE.W	P61_rowpos,D6
-	MOVE.W	P61_DUMMY_SEQPOS,D5
-	CMP.W	D5,D6
-	BEQ.S	.dontResetRowPos
-	MOVE.W	D6,P61_DUMMY_SEQPOS
-	ADDQ.W	#1,D0
-	AND.W	#15,D0
-	MOVE.W	D0,P61_SEQ_POS
-	.dontResetRowPos:
-	LEA	SEQ_POS_ON,A0
-	MOVE.B	(A0,D0.W),LED_ON\.HPOS
-	LEA	SEQ_POS_OFF,A0
-	MOVE.B	(A0,D0.W),LED_OFF\.HPOS
-	LEA	SEQ_POS_BIT,A0
-	MOVE.B	(A0,D0.W),LED_ON\.CTRL
-	MOVE.B	(A0,D0.W),LED_OFF\.CTRL
-	; ## SEQUENCER LEDS ##
-	RTS
-
-__UNSET_CODE:
-	LEA	Mainloop\.notFirstBlock,A0	; 2
-	MOVE.L	#$4E714E71,(A0)+		; NOP opcodes 3
-	MOVE.L	#$4E714E71,(A0)+		; NOP opcodes 3
-	MOVE.L	#$4E714E71,(A0)+		; NOP opcodes 3
-	RTS
-
 ;********** Fastmem Data **********
 	INCLUDE	"sincosin_table.i"	; VALUES
 
@@ -585,7 +547,7 @@ SEQ_POS_ON:	DC.B $00,$51,$5C,$65,$00,$7A,$84,$8E,$00,$A3,$AD,$B8,$00,$CD,$D8,$E2
 SEQ_POS_BIT:	DC.B $1,$1,$0,$1,$0,$0,$1,$1,$0,$0,$1,$0,$1,$0,$1,$1
 SEQ_POS_OFF:	DC.B $47,$00,$00,$00,$70,$00,$00,$00,$99,$00,$00,$00,$C2,$00,$00,$00
 
-BITPLANE_PTR:	DC.L TR909+(bpl*h*4);	+(bpl/2)-(LOGOBPL/2)	; bitplane azzerato lowres
+BITPLANE_PTR:	DC.L BITPLANE	; bitplane azzerato lowres
 DrawBuffer:	DC.L SCREEN2	; pointers to buffers
 ViewBuffer:	DC.L SCREEN1	; to be swapped
 
@@ -637,14 +599,14 @@ COPPER:
 	DC.W $100,bpls*$1000+$200	; enable bitplanes
 
 	.Palette:
-	DC.W $0180,$0000,$0182,$0853,$0184,$0BBB,$0186,$0D61
-	DC.W $0188,$0D88,$018A,$0667,$018C,$0556,$018E,$0FFF
-	DC.W $0190,$0EEE,$0192,$0DDD,$0194,$0CCD,$0196,$0CCC
-	DC.W $0198,$0AAA,$019A,$0999,$019C,$0888,$019E,$0777
-	DC.W $01A0,$0555,$01A2,$0444,$01A4,$0F0F,$01A6,$0EEF
-	DC.W $01A8,$0BBC,$01AA,$099A,$01AC,$0F89,$01AE,$00FF
-	DC.W $01B0,$0CBA,$01B2,$0CA9,$01B4,$0778,$01B6,$0F0F
-	DC.W $01B8,$00F0,$01BA,$0B00,$01BC,$0632,$01BE,$0F00
+	DC.W $0180,$0000,$0182,$0CCC,$0184,$0BBC,$0186,$099A
+	DC.W $0188,$0889,$018A,$0778,$018C,$0667,$018E,$0556
+	DC.W $0190,$0FFF,$0192,$0EEE,$0194,$0DDD,$0196,$0CCD
+	DC.W $0198,$0BBB,$019A,$0AAA,$019C,$0999,$019E,$0888
+	DC.W $01A0,$0777,$01A2,$0666,$01A4,$0555,$01A6,$0444
+	DC.W $01A8,$0222,$01AA,$0DDE,$01AC,$0AAB,$01AE,$0EEF
+	DC.W $01B0,$0CBB,$01B2,$0CA9,$01B4,$0E98,$01B6,$0D61
+	DC.W $01B8,$0853,$01BA,$0B00,$01BC,$0632,$01BE,$0F00
 
 	.BplPtrs:
 	DC.W $E0,0
@@ -690,8 +652,8 @@ _COPPER:
 	SECTION	ChipBuffers,BSS_C	;BSS doesn't count toward exe size
 ;*******************************************************************************
 
-BUFFER3D:		DS.B LOGOSIDE*bpl	; bigger to hold zoom
-EMPTY:		DS.B LOGOSIDE*bpl	; clear buffer
+BITPLANE:		DS.B h*bwid	; bitplane azzerato lowres
+EMPTY:		DS.B h*bpl
 SCREEN1:		DS.B h*bwid	; Define storage for buffer 1
 SCREEN2:		DS.B h*bwid	; two buffers
 
