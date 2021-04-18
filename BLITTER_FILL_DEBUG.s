@@ -1,3 +1,4 @@
+;APS00000000000000000000000000000000000000000000000000000000000000000000000000000000
 ;*** WWW.KONEY.ORG *******
 ;*** MiniStartup by Photon ***
 	INCDIR	"NAS:AMIGA/CODE/mechmicrobes_amiga/"
@@ -117,11 +118,11 @@ Demo:				;a4=VBR, a6=Custom Registers Base addr
 
 	;---  Call P61_Init  ---
 	MOVEM.L	D0-A6,-(SP)
-	LEA	MODULE,A0
+	;LEA	MODULE,A0
 	SUB.L	A1,A1
 	SUB.L	A2,A2
 	MOVE.W	#MODSTART_POS,P61_InitPos	; TRACK START OFFSET
-	JSR	P61_Init
+	;JSR	P61_Init
 	MOVEM.L (SP)+,D0-A6
 
 	MOVE.L	#COPPER,COP1LC	; ATTACH THE COPPER
@@ -297,7 +298,7 @@ MainLoop:
 
 	BSR.W	__BLIT_3D_IN_PLACE
 
-	ADDI.W	#2,ANGLE		; JUST ROTATE :)
+	;ADDI.W	#2,ANGLE		; JUST ROTATE :)
 	;*--- main loop end ---*
 
 	ENDING_CODE:
@@ -310,7 +311,7 @@ MainLoop:
 	;*--- exit ---*
 	;    ---  Call P61_End  ---
 	MOVEM.L D0-A6,-(SP)
-	JSR P61_End
+	;JSR P61_End
 	MOVEM.L (SP)+,D0-A6
 	RTS
 
@@ -347,8 +348,8 @@ ClearBuffer:			; by KONEY
 	MOVE.W	#LOGOSIDE*bpls*64+bpl/2,BLTSIZE	; Start Blitter (Blitsize)
 	rts
 ClearBuffer2:
-	BSR	WaitBlitter
-	MOVE.W	#$09F0,BLTCON0		; A**,Shift 0, A -> D
+	bsr	WaitBlitter
+	MOVE.W	#$09f0,BLTCON0		; A**,Shift 0, A -> D
 	MOVE.W	#0,BLTCON1		; Everything Normal
 	MOVE.L	#0,BLTAMOD		; Init modulo Sou. A
 	MOVE.W	#0,BLTDMOD		; Init modulo Dest D
@@ -440,6 +441,7 @@ Drawline:
 				; all'interno del byte i bit sono numerati 
 				; da destra a sinistra, mentre le coordinate
 				; dei pixel vanno da sinistra a destra
+	CLR.W	$100		; DEBUG | w 0 100 2
 	bchg	d1,(a1)		; inverti il primo pixel della linea
 
 	move.w	d2,d1		; copia DX in D1
@@ -584,8 +586,8 @@ ViewBuffer:	DC.L SCREEN1		; to be swapped
 
 	SECTION	ChipData,DATA_C	;declared data that must be in chipmem
 
-TR909:		INCBIN "TR-909_368x230x5.raw"
-MODULE:		INCBIN "mechmicrobes.P61"	; code $B000
+TR909:		INCBIN "testpic_368x230x5.raw"
+;MODULE:		INCBIN "mechmicrobes.P61"	; code $B000
 
 LED_ON:
 	.VPOS:
