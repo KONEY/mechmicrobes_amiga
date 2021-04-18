@@ -421,10 +421,10 @@ __BLIT_3D_IN_PLACE:
 	MOVE.W	#%000000000010010,BLTCON1		; BLTCON1 lo spiegheremo dopo
 	MOVE.L	#0,BLTAMOD			; Init modulo Sou. A
 	MOVE.L	BITPLANE_PTR,A4
-	ADD.L	#(h*bpl-2),A4
+	ADD.L	#h*bpl-2,A4
 	MOVE.L	A4,BLTAPTH	; BLTAPT  (fisso alla figura sorgente)
 	MOVE.L	DrawBuffer,A4
-	ADD.L	#(h*bpl-2),A4
+	ADD.L	#h*bpl-2,A4
 	MOVE.L	A4,BLTDPTH
 	MOVE.W	#(h*64)+(w/16),BLTSIZE		; Start Blitter (Blitsize)
 	RTS

@@ -353,7 +353,7 @@ ClearBuffer2:
 	MOVE.W	#0,BLTDMOD		; Init modulo Dest D
 	MOVE.L	#EMPTY,BLTAPTH		; Source
 	MOVE.L	#BUFFER3D,BLTDPTH		; Dest
-	MOVE.W	#(w*64)+(LOGOSIDE/16),BLTSIZE	; Start Blitter (Blitsize)
+	MOVE.W	#w*64+LOGOSIDE/16,BLTSIZE	; Start Blitter (Blitsize)
 	RTS
 
 ;******************************************************************************
@@ -504,18 +504,22 @@ __ROTATE:
 
 __BLIT_3D_IN_PLACE:
 	bsr	WaitBlitter
-	MOVE.W	#$FFFF,BLTAFWM			; BLTAFWM lo spiegheremo dopo
-	MOVE.W	#$FFFF,BLTALWM			; BLTALWM lo spiegheremo dopo
-	MOVE.W	#%0000100111110000,BLTCON0		; BLTCON0 (usa A+D)
-	;MOVE.W	#%0000000000001010,BLTCON1		; BLTCON1 lo spiegheremo dopo
-	MOVE.W	#%0000000000000000,BLTCON1		; BLTCON1 lo spiegheremo dopo
-	MOVE.W	#bpl-LOGOBPL,BLTAMOD		; BLTAMOD =0 perche` il rettangolo
-	MOVE.W	#bpl-LOGOBPL,BLTDMOD		; Init modulo Dest D
-	MOVE.L	#BUFFER3D+((bpl/2)-(LOGOBPL/2)),BLTAPTH	; BLTAPT  (fisso alla figura sorgente)
+	MOVE.W	#$FFFF,BLTAFWM		; BLTAFWM lo spiegheremo dopo
+	MOVE.W	#$FFFF,BLTALWM		; BLTALWM lo spiegheremo dopo
+	MOVE.W	#%0000100111110000,BLTCON0	; BLTCON0 (usa A+D)
+	;MOVE.W	#%0000000000001010,BLTCON1	; BLTCON1 lo spiegheremo dopo
+	MOVE.W	#%0000000000000010,BLTCON1	; BLTCON1 lo spiegheremo dopo
+	MOVE.W	#bpl-LOGOBPL,BLTAMOD	; BLTAMOD =0 perche` il rettangolo
+	MOVE.W	#bpl-LOGOBPL,BLTDMOD	; Init modulo Dest D
+	MOVE.L	#BUFFER3D,A4
+	ADD.L	#bpl/2-LOGOBPL/2,A4
+	ADD.L	#(LOGOSIDE+16)*40-2,A4	; FOR DESC MODE - WHY THIS VALUES??
+	MOVE.L	A4,BLTAPTH		; BLTAPT  (fisso alla figura sorgente)
 	MOVE.L	BITPLANE_PTR,A4
-	ADD.L	#((bpl/2)-(LOGOBPL/2)),A4
+	ADD.L	#bpl/2-LOGOBPL/2,A4
+	ADD.L	#(LOGOSIDE+16)*40-2,A4	; FOR DESC MODE - WHY THIS VALUES??
 	MOVE.L	A4,BLTDPTH
-	MOVE.W	#(LOGOSIDE*64)+(LOGOSIDE/16),BLTSIZE	; Start Blitter (Blitsize)
+	MOVE.W	#LOGOSIDE*64+LOGOSIDE/16,BLTSIZE	; Start Blitter (Blitsize)
 	RTS
 
 __SET_SEQUENCER_LEDS:
@@ -540,15 +544,10 @@ __SET_SEQUENCER_LEDS:
 	; ## SEQUENCER LEDS ##
 	RTS
 
-__UNSET_CODE:
-	LEA	Mainloop\.notFirstBlock,A0	; 2
-	MOVE.L	#$4E714E71,(A0)+		; NOP opcodes 3
-	MOVE.L	#$4E714E71,(A0)+		; NOP opcodes 3
-	MOVE.L	#$4E714E71,(A0)+		; NOP opcodes 3
-	RTS
-
 ;********** Fastmem Data **********
 	INCLUDE	"sincosin_table.i"	; VALUES
+
+value:		DC.L 0
 
 P61_LAST_POS:	DC.W MODSTART_POS
 P61_DUMMY_POS:	DC.W 0
@@ -586,8 +585,8 @@ SEQ_POS_BIT:	DC.B $1,$1,$0,$1,$0,$0,$1,$1,$0,$0,$1,$0,$1,$0,$1,$1
 SEQ_POS_OFF:	DC.B $47,$00,$00,$00,$70,$00,$00,$00,$99,$00,$00,$00,$C2,$00,$00,$00
 
 BITPLANE_PTR:	DC.L TR909+(bpl*h*4);	+(bpl/2)-(LOGOBPL/2)	; bitplane azzerato lowres
-DrawBuffer:	DC.L SCREEN2	; pointers to buffers
-ViewBuffer:	DC.L SCREEN1	; to be swapped
+DrawBuffer:	DC.L SCREEN2		; pointers to buffers
+ViewBuffer:	DC.L SCREEN1		; to be swapped
 
 	SECTION	ChipData,DATA_C	;declared data that must be in chipmem
 
