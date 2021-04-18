@@ -3,7 +3,7 @@
 	INCDIR	"NAS:AMIGA/CODE/mechmicrobes_amiga/"
 	SECTION	"Code",CODE
 	INCLUDE	"PhotonsMiniWrapper1.04!.S"
-	INCLUDE	"custom-registers.i"	;use if you like ;)
+	INCLUDE	"custom-registers.i"
 	INCLUDE	"PT12_OPTIONS.i"
 	INCLUDE	"P6112-Play-stripped.i"
 ;********** Constants **********
@@ -19,6 +19,7 @@ LOGOSIDE=16*7
 LOGOBPL=LOGOSIDE/16*2
 MARGINX=(w/2)
 MARGINY=(LOGOSIDE/2)-9
+KCOLOR=$EEF
 ;*************
 MODSTART_POS=0		; start music at position # !! MUST BE EVEN FOR 16BIT
 ;*************
@@ -158,21 +159,15 @@ MainLoop:
 	; ## SONG POS RESETS ##
 
 	;CLR.W	$100		; DEBUG | w 0 100 2
-	.notFirstBlock:
-	LEA	(PC),A2
-	MOVE.W	P61_LAST_POS,D0
-	CMPI	#0,D0
-	BEQ.S	.dontStartSequencer
+	.block0:			; BEWARE THE SMC !!
+	TST.W	P61_LAST_POS
+	BEQ.B	.skipSequencer
 	MOVE.W	#$F00,$DFF180	; show rastertime left down to $12c
-	LEA	.skipCMP,A1
-	SUB.W	A2,A1
-	MOVE.W	A1,D0
-	EOR.W	#$6000,D0	; BRA.S	.skipCMP
-	LEA	.notFirstBlock,A0
-	MOVE.W	D0,(A0)
-	.skipCMP:
+	; mock a BRA.S .skipCMP
+	MOVE.W	#$6000|(.call-(.block0+2)),.block0
+	.call:	
 	BSR.W	__SET_SEQUENCER_LEDS
-	.dontStartSequencer:
+	.skipSequencer:
 
 	; **** JOYSTICK TEST ****
 	MOVEM.W	$DFF00C,D0	; FROM EAB
@@ -647,8 +642,30 @@ COPPER:
 
 	; **** COPPERWAITS ****
 
+	.LOGO_COLORS:
+	DC.W $3001,$FF00		; horizontal position masked off
+	DC.W $01B6,KCOLOR
+	DC.W $01AC,$0BBC		; TRASP?
+	DC.W $01A4,KCOLOR
+	DC.W $01BE,KCOLOR		; TRASP?
+	DC.W $01B8,KCOLOR		; TRASP?
+	DC.W $01A2,$0BBB
+	DC.W $01A6,$0DDD
+
+	DC.W $8001,$FF00		; SECOND PART
+	DC.W $01A6,$0DDD
+	DC.W $01AA,$0DDE
+
+	DC.W $A001,$FF00		; END OF LOGO - RESTORE
+	DC.W $01B6,$0000
+	DC.W $01BE,$0F00
+	DC.W $01A2,$0444
+	DC.W $01A6,$0EEF
+	DC.W $01AA,$099A
+	;DC.W $0196,$0CCC		; TRASP?
+
 	.SEQ_LED:
-	DC.W $F801,$FF00	; horizontal position masked off
+	DC.W $F801,$FF00		; horizontal position masked off
 	DC.W $174,$FC00,$176,$FC00	; SPR6DATA
 	DC.W $17C,$0000,$17E,$FC00	; SPR7DATA
 	DC.W $FA01,$FF00
