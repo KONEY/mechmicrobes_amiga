@@ -297,7 +297,7 @@ MainLoop:
 
 	BSR.W	__BLIT_3D_IN_PLACE
 
-	ADDI.W	#2,ANGLE		; JUST ROTATE :)
+	;ADDI.W	#2,ANGLE		; JUST ROTATE :)
 	;*--- main loop end ---*
 
 	ENDING_CODE:
@@ -374,99 +374,81 @@ Drawline:
 	ADDI.W	#MARGINX,D2
 	ADDI.W	#MARGINY,D3
 
-	cmp.w	d1,d3		; se D3>D1 i punti sono gia` nell'ordine giusto
-	bge.w	Ordinati
-	exg.l	d1,d3		; altrimenti scambiali
-	exg.l	d0,d2
-	Ordinati:
-	sub.w	d1,d3		; D3=DiffY  (e` sicuramente positivo)
-
-	; * scelta ottante
-	sub.w	d0,d2		; D2=X2-X1
-	bmi.s	DRAW4		; se negativo salta, altrimenti D2=DiffX
-	cmp.w	d3,d2		; confronta DiffX e DiffY
-	bmi.s	DRAW1		; se D2<D3 salta..
-				; .. altrimenti D3=DY e D2=DX
-	moveq	#$10,d5		; codice ottante
-	bra.s	DRAWL
-
-	DRAW1:
-	exg.l	d2,d3		; scambia D2 e D3, in modo che D3=DY e D2=DX
-	moveq	#$00,d5		; codice ottante
-	bra.s	DRAWL
-
-	DRAW4:
-	neg.w	d2		; rende D2 positivo
-	cmp.w	d3,d2		; confronta DiffX e DiffY
-	bmi.s	DRAW5		; se D2<D3 salta..
-				; .. altrimenti D3=DY e D2=DX
-	moveq	#$14,d5		; codice ottante
-	bra.s	DRAWL
-
-	DRAW5:
-	exg.l	d2,d3		; scambia D2 e D3, in modo che D3=DY e D2=DX
-	moveq	#$08,d5		; codice ottante
-	bra.w	DRAWL
-
-	; Quando l'esecuzione raggiunge questo punto, abbiamo:
-	; D2 = DX
-	; D3 = DY
-	; D5 = codice ottante
-
-	DRAWL:
+	sub.w	d1,d3	; D3=Y2-Y1
+	beq.s	.skip	; per il fill non servono linee orizzontali 
+	bgt.s	.y2gy1	; salta se positivo..
+	exg	d0,d2	; ..altrimenti scambia i punti
+	add.w	d3,d1	; mette in D1 la Y piu` piccola
+	neg.w	d3	; D3=DY
+	.y2gy1:
 	mulu.w	#bpl,d1		; offset Y
-	add.w	d1,a0		; aggiunge l'offset Y all'indirizzo
+	add.l	d1,a0
+	moveq	#0,d1		; D1 indice nella tabella ottanti
+	sub.w	d0,d2		; D2=X2-X1
+	bge.s	.xdpos		; salta se positivo..
+	addq.w	#2,d1		; ..altrimenti sposta l'indice
+	neg.w	d2		; e rendi positiva la differenza
+	.xdpos:
+	moveq	#$f,d4		; maschera per i 4 bit bassi
+	and.w	d0,d4		; selezionali in D4
+	
+				; solo se DL_Fill=1
+	move.b	d4,d5		; calcola numero del bit da invertire
+	not.b	d5		; (la BCHG numera i bit in modo inverso	
 
-	move.w	d0,d1		; copia la coordinata X
-	lsr.w	#4,d1		; cancella i 4 bit bassi della X
-	add.w	d1,d1		; ottiene l'offset X in bytes
-	add.w	d1,a0		; aggiunge l'offset X all'indirizzo
+	lsr.w	#3,d0		; offset X:
+				; Allinea a byte (serve per BCHG)
+	add.w	d0,a0		; aggiunge all'indirizzo
+				; nota che anche se l'indirizzo
+				; e` dispari non fa nulla perche`
+				; il blitter non tiene conto del
+				; bit meno significativo di BLTxPT
 
-	andi.w	#$000F,d0	; seleziona i 4 bit piu` bassi della X..
-	move.w	d0,d1		; .. li copia in D1..
-	ror.w	#4,d0		; .. e li sposta nei bit da 12 a 15
-	ori.w	#$0B4A,d0	; con un OR ottengo il valore da scrivere
-				; in BLTCON0. Con questo valore di LF ($4A)
-				; si disegnano linee in EOR con lo sfondo.
-				; in BLTCON0. Con questo valore di LF ($4A)
-	move.l	a0,a1		; copia l'indirizzo
-	cmpi.w	#7,d1		; il numero del bit e` > 7 ?
-	ble.s	NonCorreggi	; se no salta
-	addq.w	#1,a1		; ..altrimenti punta al prossimo byte
-	subq.w	#8,d1		; e rendi il numero del bit < 7
-	NonCorreggi:
-	not.b	d1		; inverti la numerazione dei bit
-				; questa istruzione e` necessaria perche`
-				; all'interno del byte i bit sono numerati 
-				; da destra a sinistra, mentre le coordinate
-				; dei pixel vanno da sinistra a destra
-	bchg	d1,(a1)		; inverti il primo pixel della linea
+	ror.w	#4,d4		; D4 = valore di shift A
+	or.w	#$0B4A,d4	; aggiunge l'opportuno
+				; Minterm (OR o EOR)
+	swap	d4		; valore di BLTCON0 nella word alta
+		
+	cmp.w	d2,d3		; confronta DiffX e DiffY
+	bge.s	.dygdx		; salta se >=0..
+	addq.w	#1,d1		; altrimenti setta il bit 0 del'indice
+	exg	d2,d3		; e scambia le Diff
+	.dygdx:
+	add.w	d2,d2		; D2 = 2*DiffX
+	move.w	d2,d0		; copia in D0
+	sub.w	d3,d0		; D0 = 2*DiffX-DiffY
+	addx.w	d1,d1		; moltiplica per 2 l'indice e
+				; contemporaneamente aggiunge il flag
+				; X che vale 1 se 2*DiffX-DiffY<0
+				; (settato dalla sub.w)
+	move.b	OKTS(PC,d1.w),d4	; legge l'ottante
+	swap	d2		; valore BLTBMOD in word alta
+	move.w	d0,d2		; word bassa D2=2*DiffX-DiffY
+	sub.w	d3,d2		; word bassa D2=2*DiffX-2*DiffY
+	moveq	#6,d1		; valore di shift e di test per
+				; la wait blitter 
 
-	move.w	d2,d1		; copia DX in D1
-	addq.w	#1,d1		; D1=DX+1
-	lsl.w	#$06,d1		; calcola in D1 il valore da mettere in BLTSIZE
-	addq.w	#2,d1		; aggiunge la larghezza, pari a 2 words
-
-	lsl.w	#$02,d3		; D3=4*DY
-	add.w	d2,d2		; D2=2*DX
+	lsl.w	d1,d3		; calcola il valore di BLTSIZE
+	add.w	#$42,d3
 
 	BSR	WaitBlitter
-	move.w	d3,BLTBMOD	; BLTBMOD=4*DY
-	sub.w	d2,d3		; D3=4*DY-2*DX
-	move.w	d3,BLTAPTL	; BLTAPTL=4*DY-2*DX prep val for BLTCON1
-	ori.w	#$0003,d5	; setta bit 0 (attiva line-mode), e
-	tst.w	d3
-	bpl.s	OK1		; se 4*DY-2*DX>0 salta..
-	ori.w	#$0040,d5	; altrimenti setta il bit SIGN
-	OK1:
-	move.w	d0,BLTCON0	; BLTCON0
-	move.w	d5,BLTCON1	; BLTCON1
-	sub.w	d2,d3		; D3=4*DY-4*DX
-	move.w	d3,BLTAMOD	; BLTAMOD=4*DY-4*DX
-	move.l	a0,BLTCPTH	; BLTCPT - indirizzo schermo
+
+	bchg	d5,(a0)		; Inverte il primo bit della linea
+
+	move.l	d4,BLTCON0	; BLTCON0/1
+	move.l	d2,BLTBMOD	; BLTBMOD e BLTAMOD
+	move.l	a0,BLTCPTH	; BLTCPT
+	move.w	d0,BLTAPTL	; BLTAPTL
 	move.l	a0,BLTDPTH	; BLTDPT - indirizzo schermo
-	move.w	d1,BLTSIZE	; BLTSIZE
+	move.w	d3,BLTSIZE	; BLTSIZE
+	.skip:
 	rts
+
+	OKTS:
+	DC.B 3,3+$40
+	DC.B 19,19+$40
+	DC.B 11,11+$40
+	DC.B 23,23+$40
 
 ;******************************************************************************
 ; Questa routine setta i registri del blitter che non devono essere
