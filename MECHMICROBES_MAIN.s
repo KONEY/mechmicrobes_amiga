@@ -786,7 +786,7 @@ COPPER:
 	DC.W $17C,$0000,$17E,$0000	; SPR7DATA
 
 	DC.W $FF01,$FF00		; horizontal position masked off
-	DC.W $018E,$0CCD		; SCROLLTEXT - $0D61
+	DC.W $018E,$0BBB		; SCROLLTEXT - $0D61
 
 	DC.W $FFDF,$FFFE		; allow VPOS>$ff
 
