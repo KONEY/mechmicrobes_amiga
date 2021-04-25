@@ -18,8 +18,7 @@ Z_Shift=PXLSIDE*5/2	; 5x5 obj
 LOGOSIDE=16*7
 LOGOBPL=LOGOSIDE/16*2
 MARGINX=(w/2)
-MARGINY=(LOGOSIDE/2)-9
-KCOLOR=$FFF
+MARGINY=(LOGOSIDE/2)
 ;*************
 MODSTART_POS=0		; start music at position # !! MUST BE EVEN FOR 16BIT
 ;*************
@@ -32,8 +31,8 @@ VarTimesTrig MACRO ;3 = 1 * 2, where 2 is cos(Angle)^(TrigShift*2) or sin(Angle)
 	asr.l #TrigShift,\3
 	ENDM
 
-;********** Demo **********	;Demo-specific non-startup code below.
-Demo:				;a4=VBR, a6=Custom Registers Base addr
+;********** Demo **********	; Demo-specific non-startup code below.
+Demo:				; a4=VBR, a6=Custom Registers Base addr
 	;*--- init ---*
 	MOVE.L	#VBint,$6C(A4)
 	MOVE.W	#%1110000000100000,INTENA
@@ -142,11 +141,13 @@ MainLoop:
 	bsr.w	PokePtrs
 	;*--- ...draw into the other(a2) ---*
 	move.l	a2,a1
-	bsr	ClearBuffer2
-	;MOVE.L	#BUFFER3D,DrawBuffer
-	MOVE.L	#TR909,DrawBuffer
 
+	BSR	ClearBlitterBuffer
+	BSR.W	__SET_PT_VISUALS
+	MOVE.L	#TR909,DrawBuffer
 	; do stuff here :)
+
+	MOVE.W	AUDIOCHLEVEL2,Z_POS
 
 	; ## SONG POS RESETS ##
 	MOVE.W	P61_Pos,D6
@@ -298,7 +299,7 @@ MainLoop:
 	ENDING_CODE:
 	BTST	#6,$BFE001
 	BNE.S	.DontShowRasterTime
-	MOVE.W	#$0FF,$DFF180	; show rastertime left down to $12c
+	MOVE.W	#$0FF,$DFF196	; show rastertime left down to $12c
 	.DontShowRasterTime:
 	BTST	#2,$DFF016	; POTINP - RMB pressed?
 	BNE.W	MainLoop		; then loop
@@ -334,14 +335,8 @@ VBint:				; Blank template VERTB interrupt
 	move.w	#$20,$DFF09C	; KONEY REFACTOR
 	.notvb:	
 	rte
-ClearBuffer:			; by KONEY
-	bsr	WaitBlitter
-	clr.w	BLTDMOD			; destination modulo
-	move.l	#$01000000,BLTCON0		; set operation type in BLTCON0/1
-	move.l	BITPLANE_PTR,BLTDPTH		; destination address
-	MOVE.W	#LOGOSIDE*bpls*64+bpl/2,BLTSIZE	; Start Blitter (Blitsize)
-	rts
-ClearBuffer2:
+
+ClearBlitterBuffer:
 	BSR	WaitBlitter
 	MOVE.W	#$09F0,BLTCON0		; A**,Shift 0, A -> D
 	MOVE.W	#0,BLTCON1		; Everything Normal
@@ -351,23 +346,12 @@ ClearBuffer2:
 	MOVE.L	#BUFFER3D,BLTDPTH		; Dest
 	MOVE.W	#w*64+LOGOSIDE/16,BLTSIZE	; Start Blitter (Blitsize)
 	RTS
-
-;******************************************************************************
-; Questa routine effettua il disegno della linea. prende come parametri gli
-; estremi della linea P1 e P2, e l'indirizzo del bitplane su cui disegnarla.
-; D0 - X1 (coord. X di P1)
-; D1 - Y1 (coord. Y di P1)
-; D2 - X2 (coord. X di P2)
-; D3 - Y2 (coord. Y di P2)
-; A0 - indirizzo bitplane
-;******************************************************************************
-
 Drawline:
 	LEA	BUFFER3D,A0
 	ADDI.W	#MARGINX,D0
-	ADDI.W	#MARGINY,D1
+	ADD.W	TOP_MARGIN,D1
 	ADDI.W	#MARGINX,D2
-	ADDI.W	#MARGINY,D3
+	ADD.W	TOP_MARGIN,D3
 
 	sub.w	d1,d3	; D3=Y2-Y1
 	beq.s	.skip	; per il fill non servono linee orizzontali 
@@ -400,7 +384,7 @@ Drawline:
 				; bit meno significativo di BLTxPT
 
 	ror.w	#4,d4		; D4 = valore di shift A
-	or.w	#$0B4A,d4	; aggiunge l'opportuno
+	ori.w	#$0B4A,d4	; aggiunge l'opportuno
 				; Minterm (OR o EOR)
 	swap	d4		; valore di BLTCON0 nella word alta
 		
@@ -444,12 +428,6 @@ Drawline:
 	DC.B 19,19+$40
 	DC.B 11,11+$40
 	DC.B 23,23+$40
-
-;******************************************************************************
-; Questa routine setta i registri del blitter che non devono essere
-; cambiati tra una line e l'altra
-;******************************************************************************
-
 InitLine:
 	BSR	WaitBlitter
 	moveq.l	#-1,d5
@@ -459,9 +437,6 @@ InitLine:
 	move.w	#bpl,BLTDMOD	; BLTDMOD = 40
 	rts
 
-;******************************************************************************
-; D0-D1
-;******************************************************************************
 __ROTATE:
 	; Rotate around Z Axis:
 	VarTimesTrig d0,d4,d5	;left = rotatedX * cos
@@ -517,18 +492,40 @@ __SET_SEQUENCER_LEDS:
 	; ## SEQUENCER LEDS ##
 	RTS
 
+__SET_PT_VISUALS:
+	; ## MOD VISUALIZERS ##########
+	; ## COMMANDS 80x TRIGGERED EVENTS ##
+	;MOVE.W	P61_1F,D2		; 1Fx
+	MOVE.W	P61_E8,D2		; 80x
+	; ## COMMANDS 80x TRIGGERED EVENTS ##
+	; KICK
+	LEA	P61_visuctr2(PC),A0 ; which channel? 0-3
+	MOVEQ	#15,D0		; maxvalue
+	SUB.W	(A0),D0		; -#frames/irqs since instrument trigger
+	BPL.S	.ok1		; below minvalue?
+	MOVEQ	#0,D0		; then set to minvalue
+	.ok1:
+	DIVU.W	#2,D0
+	MOVE.B	D0,AUDIOCHLEVEL2
+	;MOVE.W	D0,LOGOCOL1	; poke WHITE color now
+	_ok1:
+	RTS
+	; MOD VISUALIZERS *****
+
 ;********** Fastmem Data **********
 	INCLUDE	"sincosin_table.i"	; VALUES
 
+AUDIOCHLEVEL2:	DC.W 0
 P61_LAST_POS:	DC.W MODSTART_POS
 P61_DUMMY_POS:	DC.W 0
 P61_FRAMECOUNT:	DC.W 0
 P61_SEQ_POS:	DC.W 0
 P61_DUMMY_SEQPOS:	DC.W 63
 ANGLE:		DC.W 0
-Z_POS:		DC.W 12
+Z_POS:		DC.W 72	; 72 for min | -6 for big | 3 max 45 deg
 Z_FACT:		DC.W 0
 CENTER:		DC.W 0
+TOP_MARGIN:	DC.W MARGINY-16
 X_TEMP:		DC.W 0
 Y_TEMP:		DC.W 0
 XY_INIT:		DC.W 0
@@ -555,7 +552,7 @@ SEQ_POS_ON:	DC.B $00,$51,$5C,$65,$00,$7A,$84,$8E,$00,$A3,$AD,$B8,$00,$CD,$D8,$E2
 SEQ_POS_BIT:	DC.B $1,$1,$0,$1,$0,$0,$1,$1,$0,$0,$1,$0,$1,$0,$1,$1
 SEQ_POS_OFF:	DC.B $47,$00,$00,$00,$70,$00,$00,$00,$99,$00,$00,$00,$C2,$00,$00,$00
 
-BITPLANE_PTR:	DC.L TR909+(bpl*h*4);	+(bpl/2)-(LOGOBPL/2)	; bitplane azzerato lowres
+BITPLANE_PTR:	DC.L TR909+(bpl*h*4)	; +(bpl/2)-(LOGOBPL/2)
 DrawBuffer:	DC.L SCREEN2		; pointers to buffers
 ViewBuffer:	DC.L SCREEN1		; to be swapped
 
@@ -643,38 +640,38 @@ COPPER:
 	; **** COPPERWAITS ****
 	.LOGO_COLORS:
 	DC.W $3001,$FF00		; ## START ##
-	DC.W $01B6,KCOLOR
+	DC.W $01B6,$0FFF		; WHITE
 	DC.W $01AC,$0BBC		; TRASP?
-	DC.W $01A4,KCOLOR
-	DC.W $01BE,KCOLOR		; TRASP?
-	DC.W $01B8,KCOLOR		; TRASP?
-	DC.W $01A2,$0BBB
-	DC.W $01A6,$0DDD
+	DC.W $01A4,$0FFF
+	DC.W $01BE,$0FFF		; TRASP?
+	DC.W $01B8,$0DDE		; TRASP?
 
 	DC.W $8001,$FF00		; ## SECOND PART TXT ##
+	DC.W $01A2,$0DDD
 	DC.W $0182,$0999		; TXT DARK
 	DC.W $0186,$0AAA		; TXT LIGHT
-	DC.W $01AA,$0DDD
+	DC.W $01A6,$0DDD
 
 	DC.W $8601,$FF00		; ## KNOBS ##
+	DC.W $01AA,$0BBB
 	DC.W $0182,$0853		; TXT RESTORE
 	DC.W $0186,$0D61		; TXT RESTORE
-	DC.W $01A6,$0DDD
-	DC.W $9001,$FF00	
-	DC.W $01AA,$0CCD
+	DC.W $01A2,$0CCD
+	DC.W $01A6,$0EEF
 	DC.W $0198,$0999
 
 	DC.W $9401,$FF00		; ## TXT ##
 	DC.W $0182,$0999		; TXT DARK
 	DC.W $0186,$0AAA		; TXT LIGHT
+	DC.W $01AA,$0BBB
+	DC.W $01A6,$0DDD
 
 	DC.W $9A01,$FF00		; ## KNOBS ##
 	DC.W $0182,$0853		; TXT RESTORE
 	DC.W $0186,$0D61		; TXT RESTORE
+	DC.W $01A6,$0EEF
 
 	DC.W $B001,$FF00		; ## RESTORE ##
-	;DC.W $0196,$0CCC		; BG
-
 	DC.W $01B6,$0000
 	DC.W $01BE,$0F00
 	DC.W $01A2,$0444
