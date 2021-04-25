@@ -10,7 +10,7 @@
 w=368		;screen width, height, depth
 h=230
 bpls=5		;handy values:
-bpl=w/16*2	;byte-width of 1 bitplane line (40)
+bpl=w/16*2	;byte-width of 1 bitplane line (46)
 bwid=bpls*bpl	;byte-width of 1 pixel line (all bpls)
 TrigShift=7
 PXLSIDE=16
@@ -519,12 +519,12 @@ __SET_PT_VISUALS:
 __POPULATETXTBUFFER:
 	MOVEM.L	D0-A6,-(SP)	; SAVE TO STACK
 	MOVE.W	FRAMESINDEX,D7
-	CMP.W	#TXT_FRMSKIP,D7
+	CMPI.W	#3,D7
 	BNE.W	.SKIP
 	MOVE.L	BGPLANE0,A4
 	LEA	FONT,A5
 	LEA	TEXT,A6
-	ADD.W	#bpl*(h-19)+2,A4	; POSITIONING
+	ADD.W	#bpl*(h-19)+1,A4	; POSITIONING
 	ADD.W	TEXTINDEX,A6
 	CMP.L	#_TEXT-1,A6	; Siamo arrivati all'ultima word della TAB?
 	BNE.S	.PROCEED
@@ -532,7 +532,7 @@ __POPULATETXTBUFFER:
 	LEA	TEXT,A6		; FIX FOR GLITCH (I KNOW IT'S FUN... :)
 	.PROCEED:
 	MOVE.B	(A6),D2		; Prossimo carattere in d2
-	SUB.B	#$20,D2		; TOGLI 32 AL VALORE ASCII DEL CARATTERE, IN
+	SUBI.B	#$20,D2		; TOGLI 32 AL VALORE ASCII DEL CARATTERE, IN
 	MULU.W	#8,D2		; MOLTIPLICA PER 8 IL NUMERO PRECEDENTE,
 	ADD.W	D2,A5
 	MOVEQ	#0,D6		; RESET D6
@@ -545,15 +545,15 @@ __POPULATETXTBUFFER:
 	ADD.W	#bpl*2-2,A4	; POSITIONING
 	MOVE.B	#%00000000,(A4)	; WRAPS MORE NICELY?
 	.SKIP:
-	SUB.W	#1,D7
-	CMP.W	#0,D7
+	SUBI.W	#1,D7
+	CMPI.W	#0,D7
 	BEQ.W	.RESET
 	MOVE.W	D7,FRAMESINDEX
 	MOVEM.L	(SP)+,D0-A6	; FETCH FROM STACK
 	RTS
 	.RESET:
-	ADD.W	#1,TEXTINDEX
-	MOVE.W	#TXT_FRMSKIP,D7
+	ADDI.W	#1,TEXTINDEX
+	MOVE.W	#3,D7
 	MOVE.W	D7,FRAMESINDEX	; OTTIMIZZABILE
 	MOVEM.L	(SP)+,D0-A6	; FETCH FROM STACK
 	RTS
@@ -564,16 +564,16 @@ __SHIFTTEXT:
 	MOVE.L	BGPLANE0,A4
 	ADD.W	#bpl*(h-11),A4	; POSITIONING
 	MOVE.W	#$FFFF,BLTAFWM	; BLTAFWM lo spiegheremo dopo
-	MOVE.W	#$FFFF,BLTALWM	; BLTALWM lo spiegheremo dopo
+	MOVE.W	#$000F,BLTALWM	; BLTALWM lo spiegheremo dopo
 	MOVE.W	#%0010100111110000,BLTCON0	; BLTCON0 (usa A+D); con shift di un pixel
 	MOVE.W	#%0000000000000010,BLTCON1	; BLTCON1 BIT 12 DESC MODE
-	MOVE.W	#6,BLTAMOD	; BLTAMOD =0 perche` il rettangolo
-	MOVE.W	#6,BLTDMOD	; BLTDMOD 40-4=36 il rettangolo
+	MOVE.W	#3,BLTAMOD	; BLTAMOD =0 perche` il rettangolo
+	MOVE.W	#3,BLTDMOD	; BLTDMOD 40-4=36 il rettangolo
 
 	MOVE.L	A4,BLTAPTH	; BLTAPT  (fisso alla figura sorgente)
 	MOVE.L	A4,BLTDPTH
 
-	MOVE.W	#(5)*64+(w-40)/16,BLTSIZE	; BLTSIZE (via al blitter !)
+	MOVE.W	#5*64+(w-10)/16,BLTSIZE	; BLTSIZE (via al blitter !)
 
 	MOVEM.L	(SP)+,D0-A6	; FETCH FROM STACK
 	RTS
@@ -596,7 +596,7 @@ X_TEMP:		DC.W 0
 Y_TEMP:		DC.W 0
 XY_INIT:		DC.W 0
 TEXTINDEX:	DC.W 0
-FRAMESINDEX:	DC.W TXT_FRMSKIP
+FRAMESINDEX:	DC.W 3
 
 KONEY_OPT:	; OPTIMIZED
 	DC.W 0,0,1,0
@@ -675,6 +675,8 @@ LED_OFF:
 	DC.W $0000,$0000,$0000,$0000,$0000,$0000
 	DC.W 0,0	; 2 word azzerate definiscono la fine dello sprite.
 
+COLS_NEG	= 0
+
 COPPER:
 	DC.W $1FC,0		; Slow fetch mode, remove if AGA demo.
 	DC.W $8E,$3061		; 238h display window top, left | DIWSTRT - 11.393
@@ -713,6 +715,7 @@ COPPER:
 	DC.W $13C,0,$13E,0 ; 7
 
 	.Palette:
+	IFEQ COLS_NEG
 	DC.W $0180,$0000,$0182,$0853,$0184,$0BBB,$0186,$0D61
 	DC.W $0188,$0D88,$018A,$0667,$018C,$0556,$018E,$0FFF
 	DC.W $0190,$0EEE,$0192,$0DDD,$0194,$0CCD,$0196,$0CCC
@@ -721,6 +724,16 @@ COPPER:
 	DC.W $01A8,$0BBC,$01AA,$099A,$01AC,$0F0F,$01AE,$00FF
 	DC.W $01B0,$0CBA,$01B2,$0CA9,$01B4,$0778,$01B6,$000F
 	DC.W $01B8,$00F0,$01BA,$0B00,$01BC,$0632,$01BE,$0F00
+	ELSE
+	DC.W $0180,$0000,$0182,$09CD,$0184,$0666,$0186,$04BD
+	DC.W $0188,$0499,$018A,$0BBA,$018C,$0CCB,$018E,$0222
+	DC.W $0190,$0333,$0192,$0444,$0194,$0554,$0196,$0555
+	DC.W $0198,$0777,$019A,$0888,$019C,$0999,$019E,$0AAA
+	DC.W $01A0,$0CCC,$01A2,$0DDD,$01A4,$022D,$01A6,$0332
+	DC.W $01A8,$0665,$01AA,$0887,$01AC,$02D2,$01AE,$0D22
+	DC.W $01B0,$0567,$01B2,$0578,$01B4,$0AA9,$01B6,$0DD2
+	DC.W $01B8,$0D2D,$01BA,$06DD,$01BC,$0BDD,$01BE,$02DD
+	ENDC
 
 	; **** COPPERWAITS ****
 	.LOGO_COLORS:
@@ -773,11 +786,11 @@ COPPER:
 	DC.W $17C,$0000,$17E,$0000	; SPR7DATA
 
 	DC.W $FF01,$FF00		; horizontal position masked off
-	DC.W $018E,$0D61		; SCROLLTEXT
+	DC.W $018E,$0CCD		; SCROLLTEXT - $0D61
 
-	DC.W $FFDF,$FFFE	; allow VPOS>$ff
+	DC.W $FFDF,$FFFE		; allow VPOS>$ff
 
-	DC.W $FFFF,$FFFE	;magic value to end copperlist
+	DC.W $FFFF,$FFFE		; magic value to end copperlist
 _COPPER:
 
 ;*******************************************************************************
