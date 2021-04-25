@@ -19,6 +19,7 @@ LOGOSIDE=16*7
 LOGOBPL=LOGOSIDE/16*2
 MARGINX=(w/2)
 MARGINY=(LOGOSIDE/2)
+TXT_FRMSKIP=3
 ;*************
 MODSTART_POS=0		; start music at position # !! MUST BE EVEN FOR 16BIT
 ;*************
@@ -142,10 +143,13 @@ MainLoop:
 	;*--- ...draw into the other(a2) ---*
 	move.l	a2,a1
 
-	BSR	ClearBlitterBuffer
+	BSR.W	ClearBlitterBuffer
 	BSR.W	__SET_PT_VISUALS
 	MOVE.L	#TR909,DrawBuffer
 	; do stuff here :)
+
+	BSR.W	__POPULATETXTBUFFER
+	BSR.W	__SHIFTTEXT
 
 	MOVE.W	AUDIOCHLEVEL2,Z_POS
 
@@ -512,6 +516,68 @@ __SET_PT_VISUALS:
 	RTS
 	; MOD VISUALIZERS *****
 
+__POPULATETXTBUFFER:
+	MOVEM.L	D0-A6,-(SP)	; SAVE TO STACK
+	MOVE.W	FRAMESINDEX,D7
+	CMP.W	#TXT_FRMSKIP,D7
+	BNE.W	.SKIP
+	MOVE.L	BGPLANE0,A4
+	LEA	FONT,A5
+	LEA	TEXT,A6
+	ADD.W	#bpl*(h-19)+2,A4	; POSITIONING
+	ADD.W	TEXTINDEX,A6
+	CMP.L	#_TEXT-1,A6	; Siamo arrivati all'ultima word della TAB?
+	BNE.S	.PROCEED
+	MOVE.W	#0,TEXTINDEX	; Riparti a puntare dalla prima word
+	LEA	TEXT,A6		; FIX FOR GLITCH (I KNOW IT'S FUN... :)
+	.PROCEED:
+	MOVE.B	(A6),D2		; Prossimo carattere in d2
+	SUB.B	#$20,D2		; TOGLI 32 AL VALORE ASCII DEL CARATTERE, IN
+	MULU.W	#8,D2		; MOLTIPLICA PER 8 IL NUMERO PRECEDENTE,
+	ADD.W	D2,A5
+	MOVEQ	#0,D6		; RESET D6
+	MOVE.B	#8-1,D6
+	.LOOP:
+	ADD.W	#bpl-2,A4		; POSITIONING
+	MOVE.B	(A5)+,(A4)+
+	MOVE.B	#%00000000,(A4)+	; WRAPS MORE NICELY?
+	DBRA	D6,.LOOP
+	ADD.W	#bpl*2-2,A4	; POSITIONING
+	MOVE.B	#%00000000,(A4)	; WRAPS MORE NICELY?
+	.SKIP:
+	SUB.W	#1,D7
+	CMP.W	#0,D7
+	BEQ.W	.RESET
+	MOVE.W	D7,FRAMESINDEX
+	MOVEM.L	(SP)+,D0-A6	; FETCH FROM STACK
+	RTS
+	.RESET:
+	ADD.W	#1,TEXTINDEX
+	MOVE.W	#TXT_FRMSKIP,D7
+	MOVE.W	D7,FRAMESINDEX	; OTTIMIZZABILE
+	MOVEM.L	(SP)+,D0-A6	; FETCH FROM STACK
+	RTS
+
+__SHIFTTEXT:
+	MOVEM.L	D0-A6,-(SP)	; SAVE TO STACK
+	BSR.W	WaitBlitter
+	MOVE.L	BGPLANE0,A4
+	ADD.W	#bpl*(h-11),A4	; POSITIONING
+	MOVE.W	#$FFFF,BLTAFWM	; BLTAFWM lo spiegheremo dopo
+	MOVE.W	#$FFFF,BLTALWM	; BLTALWM lo spiegheremo dopo
+	MOVE.W	#%0010100111110000,BLTCON0	; BLTCON0 (usa A+D); con shift di un pixel
+	MOVE.W	#%0000000000000010,BLTCON1	; BLTCON1 BIT 12 DESC MODE
+	MOVE.W	#6,BLTAMOD	; BLTAMOD =0 perche` il rettangolo
+	MOVE.W	#6,BLTDMOD	; BLTDMOD 40-4=36 il rettangolo
+
+	MOVE.L	A4,BLTAPTH	; BLTAPT  (fisso alla figura sorgente)
+	MOVE.L	A4,BLTDPTH
+
+	MOVE.W	#(5)*64+(w-40)/16,BLTSIZE	; BLTSIZE (via al blitter !)
+
+	MOVEM.L	(SP)+,D0-A6	; FETCH FROM STACK
+	RTS
+
 ;********** Fastmem Data **********
 	INCLUDE	"sincosin_table.i"	; VALUES
 
@@ -529,6 +595,8 @@ TOP_MARGIN:	DC.W MARGINY-16
 X_TEMP:		DC.W 0
 Y_TEMP:		DC.W 0
 XY_INIT:		DC.W 0
+TEXTINDEX:	DC.W 0
+FRAMESINDEX:	DC.W TXT_FRMSKIP
 
 KONEY_OPT:	; OPTIMIZED
 	DC.W 0,0,1,0
@@ -552,9 +620,26 @@ SEQ_POS_ON:	DC.B $00,$51,$5C,$65,$00,$7A,$84,$8E,$00,$A3,$AD,$B8,$00,$CD,$D8,$E2
 SEQ_POS_BIT:	DC.B $1,$1,$0,$1,$0,$0,$1,$1,$0,$0,$1,$0,$1,$0,$1,$1
 SEQ_POS_OFF:	DC.B $47,$00,$00,$00,$70,$00,$00,$00,$99,$00,$00,$00,$C2,$00,$00,$00
 
+BGPLANE0:		DC.L TR909
+BGPLANE1:		DC.L TR909+bpl*h
+BGPLANE2:		DC.L TR909+bpl*h*2
+BGPLANE3:		DC.L TR909+bpl*h*3
+BGPLANE4:	DC.L TR909+bpl*h*3
 BITPLANE_PTR:	DC.L TR909+(bpl*h*4)	; +(bpl/2)-(LOGOBPL/2)
 DrawBuffer:	DC.L SCREEN2		; pointers to buffers
 ViewBuffer:	DC.L SCREEN1		; to be swapped
+
+TEXT:	DC.B "!!WARNING!! - EPILEPSY DANGER AHEAD!!   SERIOUSLY... :)    "
+	DC.B "WELCOME TO:   ### MECHMICROBES ###   KONEY'S FOURTH AMIGA HARDCORE RELEASE!   "
+	DC.B "THIS TEXT IS DUMMY TEXT, IT SAYS NOTHING, IT'S JUST A PLACEHOLDER... "
+	DC.B "ONLY FOR TESTING! - MAKE SURE TO VISIT WWW.KONEY.ORG FOR MORE INDUSTRIAL "
+	DC.B "AMIGACORE!!            .EOF                                                              "
+	EVEN
+_TEXT:
+
+FONT:		DC.L 0,0			; SPACE CHAR
+		INCBIN "cosmicalien_font.raw",0
+		EVEN
 
 	SECTION	ChipData,DATA_C	;declared data that must be in chipmem
 
@@ -687,6 +772,8 @@ COPPER:
 	DC.W $174,$0000,$176,$0000	; SPR6DATA
 	DC.W $17C,$0000,$17E,$0000	; SPR7DATA
 
+	DC.W $FF01,$FF00		; horizontal position masked off
+	DC.W $018E,$0D61		; SCROLLTEXT
 
 	DC.W $FFDF,$FFFE	; allow VPOS>$ff
 
