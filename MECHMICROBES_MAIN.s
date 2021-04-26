@@ -21,7 +21,7 @@ MARGINX=(w/2)
 MARGINY=(LOGOSIDE/2)
 TXT_FRMSKIP=3
 ;*************
-MODSTART_POS=2		; start music at position # !! MUST BE EVEN FOR 16BIT
+MODSTART_POS=8		; start music at position # !! MUST BE EVEN FOR 16BIT
 ;*************
 
 VarTimesTrig MACRO ;3 = 1 * 2, where 2 is cos(Angle)^(TrigShift*2) or sin(Angle)^(TrigShift*2)
@@ -116,30 +116,15 @@ MainLoop:
 	move.l	a2,a1
 
 	BSR.W	ClearBlitterBuffer
-
 	MOVE.L	#TR909,DrawBuffer
 	; do stuff here :)
 
 	BSR.W	__FILLANDSCROLLTXT
 
-	;MOVE.W	AUDIOCHLEVEL2,Z_POS
-
-	; ## SONG POS RESETS ##
-	MOVE.W	P61_Pos,D6
-	MOVE.W	P61_DUMMY_POS,D5
-	CMP.W	D5,D6
-	BEQ.S	.dontReset
-	ADDQ.W	#1,P61_DUMMY_POS
-	ADDQ.W	#1,P61_LAST_POS
-	.dontReset:
-	; ## SONG POS RESETS ##
-
 	.block0:			; BEWARE THE SMC !!
 	TST.W	P61_LAST_POS
 	BEQ.B	.skipSequencer
-	;MOVE.W	#$F00,$DFF180	; show rastertime left down to $12c
-	; mock a BRA.S .skipCMP
-	MOVE.W	#$6000|(.call-(.block0+2)),.block0
+	MOVE.W	#$6000|(.call-(.block0+2)),.block0	; mock a BRA.S .skipCMP
 	.call:	
 	BSR.W	__SET_SEQUENCER_LEDS
 	.skipSequencer:
@@ -469,6 +454,16 @@ __SET_SEQUENCER_LEDS:
 	RTS
 
 __SET_PT_VISUALS:
+	; ## SONG POS RESETS ##
+	MOVE.W	P61_Pos,D6
+	MOVE.W	P61_DUMMY_POS,D5
+	CMP.W	D5,D6
+	BEQ.S	.dontReset
+	ADDQ.W	#1,P61_DUMMY_POS
+	ADDQ.W	#1,P61_LAST_POS
+	.dontReset:
+	; ## SONG POS RESETS ##
+
 	; ## MOD VISUALIZERS ##########
 	; ## COMMANDS 80x TRIGGERED EVENTS ##
 	MOVE.W	P61_1F,D1		; 1Fx
@@ -495,15 +490,22 @@ __SET_PT_VISUALS:
 	; ## COMMANDS 80x TRIGGERED EVENTS ##
 
 	; KICK
-	LEA	P61_visuctr2(PC),A0 ; which channel? 0-3
+	LEA	P61_visuctr1(PC),A0 ; which channel? 0-3
 	MOVEQ	#15,D0		; maxvalue
 	SUB.W	(A0),D0		; -#frames/irqs since instrument trigger
 	BPL.S	.ok1		; below minvalue?
 	MOVEQ	#0,D0		; then set to minvalue
 	.ok1:
-	DIVU.W	#2,D0
-	MOVE.B	D0,AUDIOCHLEVEL2
-	_ok1:
+	
+	MOVE.W	P61_LAST_POS,D1
+	CMPI.W	#10,D1		; BDRUM FROM BLOCK 10
+	BLO.S	.skipZoom
+	MOVE.W	#MARGINY,TOP_MARGIN
+	LEA	ZOOM_VALUES,A0
+	MOVE.B	(A0,D0.W),D1
+	MOVE.W	D1,Z_POS
+	.skipZoom:
+
 	RTS
 	; MOD VISUALIZERS *****
 
@@ -710,7 +712,7 @@ __START_STROBO:
 ;********** Fastmem Data **********
 	INCLUDE	"sincosin_table.i"	; VALUES
 
-AUDIOCHLEVEL2:	DC.W 0
+AUDIOCHLEVEL1:	DC.W 0
 P61_LAST_POS:	DC.W MODSTART_POS
 P61_DUMMY_POS:	DC.W 0
 P61_FRAMECOUNT:	DC.W 0
@@ -726,6 +728,9 @@ Y_TEMP:		DC.W 0
 XY_INIT:		DC.W 0
 TEXTINDEX:	DC.W 0
 FRAMESINDEX:	DC.W 3
+
+ZOOM_VALUES:	DC.B 70,67,65,62,48,44,40,36,32,28,24,20,16,12,8,5,3
+		EVEN
 
 KONEY_OPT:	; OPTIMIZED
 	DC.W 0,0,1,0
@@ -813,7 +818,7 @@ COPPER2:		INCLUDE "copperlist_common.i" _COPPER2:
 
 BUFFER3D:		DS.B LOGOSIDE*bpl	; bigger to hold zoom
 EMPTY:		DS.B LOGOSIDE*bpl	; clear buffer
-SCREEN1:		DS.B h*bwid	; Define storage for buffer 1
-SCREEN2:		DS.B h*bwid	; two buffers
+SCREEN1:		DS.B 0		; Define storage for buffer 1
+SCREEN2:		DS.B 0		; two buffers
 
 END
