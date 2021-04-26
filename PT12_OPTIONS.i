@@ -82,7 +82,7 @@ usecode	=-1	;CHANGE! to the USE hexcode from P61con for a big
 		;...STOP! Have you changed it yet!? ;)
 		;You will LOSE RASTERTIME AND FEATURES if you don't.
 
-P61pl=usecode&$B000 ; MECHMICROBES
+P61pl=usecode&$100B102 ; MECHMICROBES
 
 split4	=0	;Great time gain, but INCOMPATIBLE with F03, F02, and F01
 		;speeds in the song! That's the ONLY reason it's default 0.
@@ -141,7 +141,7 @@ oscillo	=0	;1 to get a sample window (ptr, size) to read and display for
 quietstart=0	;attempt to avoid the very first click in some modules
 		;IMPORTANT: see ;@@ note about chipmem dc.w buffer.
 
-use1Fx	=0	;Optional extra effect-sync trigger (*). If your module is free
+use1Fx	=1	;Optional extra effect-sync trigger (*). If your module is free
 		;from E commands, and you add E8x to sync stuff, this will 
 		;change the usecode to include a whole code block for all E 
 		;commands. You can avoid this by only using 1Fx. (You can 

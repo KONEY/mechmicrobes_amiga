@@ -21,7 +21,7 @@ MARGINX=(w/2)
 MARGINY=(LOGOSIDE/2)
 TXT_FRMSKIP=3
 ;*************
-MODSTART_POS=0		; start music at position # !! MUST BE EVEN FOR 16BIT
+MODSTART_POS=8		; start music at position # !! MUST BE EVEN FOR 16BIT
 ;*************
 
 VarTimesTrig MACRO ;3 = 1 * 2, where 2 is cos(Angle)^(TrigShift*2) or sin(Angle)^(TrigShift*2)
@@ -41,67 +41,28 @@ Demo:				; a4=VBR, a6=Custom Registers Base addr
 	;move.w	#%1110000000000000,INTENA	; Master and lev6	; NO COPPER-IRQ!
 	MOVE.W	#%1000011111100000,DMACON
 	;*--- clear screens ---*
-	LEA	SCREEN1,A1
+	;LEA	SCREEN1,A1
 	;BSR.W	ClearScreen
-	LEA	SCREEN2,A1
+	;LEA	SCREEN2,A1
 	;BSR.W	ClearScreen
-	BSR	WaitBlitter
+	;BSR	WaitBlitter
 	;*--- start copper ---*
 	LEA	SCREEN1,A0
+
 	MOVEQ	#bpl,D0
-	LEA	COPPER\.BplPtrs+2,A1
+	LEA	COPPER1\.BplPtrs+2,A1
 	MOVEQ	#bpls-1,D1
 	BSR.W	PokePtrs
 
+	MOVEQ	#bpl,D0
+	LEA	COPPER2\.BplPtrs+2,A1
+	MOVEQ	#bpls-1,D1
+	BSR.W	PokePtrs
+
+	BSR.W	__NEGATIVE_COLORS
+
 	; #### Point LOGO sprites
-	POINT_SPRITES:
-	LEA	COPPER\.SpritePointers,A1	; Puntatori in copperlist
-	MOVE.L	#0,D0		; sprite 0
-	MOVE.W	D0,6(A1)
-	SWAP	D0
-	MOVE.W	D0,2(A1)
-
-	ADDQ.W	#8,A1
-	MOVE.L	#0,D0	; sprite 1
-	MOVE.W	D0,6(A1)
-	SWAP	D0
-	MOVE.W	D0,2(A1)
-
-	ADDQ.W	#8,A1
-	MOVE.L	#0,D0	; sprite 2
-	MOVE.W	D0,6(A1)
-	SWAP	D0
-	MOVE.W	D0,2(A1)
-
-	ADDQ.W	#8,A1
-	MOVE.L	#0,D0	; sprite 3
-	MOVE.W	D0,6(A1)
-	SWAP	D0
-	MOVE.W	D0,2(A1)
-
-	ADDQ.W	#8,A1
-	MOVE.L	#0,D0	; sprite 4
-	MOVE.W	D0,6(A1)
-	SWAP	D0
-	MOVE.W	D0,2(A1)
-
-	ADDQ.W	#8,A1
-	MOVE.L	#0,D0	; sprite 5
-	MOVE.W	D0,6(A1)
-	SWAP	D0
-	MOVE.W	D0,2(A1)
-
-	ADDQ.W	#8,A1
-	MOVE.L	#LED_ON,D0	; sprite 6
-	MOVE.W	D0,6(A1)
-	SWAP	D0
-	MOVE.W	D0,2(A1)
-
-	ADDQ.W	#8,A1
-	MOVE.L	#LED_OFF,D0	; sprite 7
-	MOVE.W	D0,6(A1)
-	SWAP	D0
-	MOVE.W	D0,2(A1)
+	BSR.W	__POINT_SPRITES
 
 	; #### CPU INTENSIVE TASKS BEFORE STARTING MUSIC
 	; ** POINTS TO COORDS **
@@ -125,11 +86,15 @@ Demo:				; a4=VBR, a6=Custom Registers Base addr
 	JSR	P61_Init
 	MOVEM.L (SP)+,D0-A6
 
-	MOVE.L	#COPPER,COP1LC	; ATTACH THE COPPER
+	BSR.W	__POINT_COPPERLISTS
+	;CLR.W	$100		; DEBUG | w 0 100 2
 ;********************  main loop  ********************
 MainLoop:
 	move.w	#$12c,d0		;No buffering, so wait until raster
 	bsr.w	WaitRaster	;is below the Display Window.
+
+	BSR.W	__SET_PT_VISUALS
+
 	;*--- swap buffers ---*
 	movem.l	DrawBuffer(PC),a2-a3
 	exg	a2,a3
@@ -137,19 +102,25 @@ MainLoop:
 	;*--- show one... ---*
 	move.l	a3,a0
 	move.l	#bpl*h,d0
-	lea	COPPER\.BplPtrs+2,a1
+	lea	COPPER1\.BplPtrs+2,a1
+	moveq	#bpls-1,d1
+	bsr.w	PokePtrs
+
+	move.l	a3,a0
+	ADD.L	#bpl,A0		; Oppure aggiungi la lunghezza di una linea
+	move.l	#bpl*h,d0
+	lea	COPPER2\.BplPtrs+2,a1
 	moveq	#bpls-1,d1
 	bsr.w	PokePtrs
 	;*--- ...draw into the other(a2) ---*
 	move.l	a2,a1
 
 	BSR.W	ClearBlitterBuffer
-	BSR.W	__SET_PT_VISUALS
+
 	MOVE.L	#TR909,DrawBuffer
 	; do stuff here :)
 
-	BSR.W	__POPULATETXTBUFFER
-	BSR.W	__SHIFTTEXT
+	BSR.W	__FILLANDSCROLLTXT
 
 	MOVE.W	AUDIOCHLEVEL2,Z_POS
 
@@ -163,11 +134,10 @@ MainLoop:
 	.dontReset:
 	; ## SONG POS RESETS ##
 
-	;CLR.W	$100		; DEBUG | w 0 100 2
 	.block0:			; BEWARE THE SMC !!
 	TST.W	P61_LAST_POS
 	BEQ.B	.skipSequencer
-	MOVE.W	#$F00,$DFF180	; show rastertime left down to $12c
+	;MOVE.W	#$F00,$DFF180	; show rastertime left down to $12c
 	; mock a BRA.S .skipCMP
 	MOVE.W	#$6000|(.call-(.block0+2)),.block0
 	.call:	
@@ -184,10 +154,12 @@ MainLoop:
 	BTST	#9,D0		; 9 LEFT
 	BEQ.S	.notLeft
 	SUBI.W	#2,ANGLE
+	BSR.W	__START_STROBO
 	.notLeft:
 	BTST	#1,D0		; 1 RIGHT
 	BEQ.S	.notRight
 	ADDI.W	#2,ANGLE
+	BSR.W	__STOP_STROBO
 	.notRight:
 	BTST	#10,D0		; 10 UP
 	BEQ.S	.notDown
@@ -499,8 +471,19 @@ __SET_SEQUENCER_LEDS:
 __SET_PT_VISUALS:
 	; ## MOD VISUALIZERS ##########
 	; ## COMMANDS 80x TRIGGERED EVENTS ##
-	;MOVE.W	P61_1F,D2		; 1Fx
+	MOVE.W	P61_1F,D2		; 1Fx
+	CMPI.W	#$F,D2		; 1F4 - INVERT DIRECTION CH 3
+	BNE.S	.skip1
+	CLR.W	$100		; DEBUG | w 0 100 2
+	BSR.W	__START_STROBO
+	MOVE.W	#0,P61_1F		; RESET FX
+	.skip1:
 	MOVE.W	P61_E8,D2		; 80x
+	CMPI.W	#$F,D2		; 804 - INVERT DIRECTION CH 3
+	BNE.S	.skip2
+	BSR.W	__STOP_STROBO
+	MOVE.W	#0,P61_E8	; RESET FX
+	.skip2:
 	; ## COMMANDS 80x TRIGGERED EVENTS ##
 	; KICK
 	LEA	P61_visuctr2(PC),A0 ; which channel? 0-3
@@ -516,22 +499,21 @@ __SET_PT_VISUALS:
 	RTS
 	; MOD VISUALIZERS *****
 
-__POPULATETXTBUFFER:
-	MOVEM.L	D0-A6,-(SP)	; SAVE TO STACK
+__FILLANDSCROLLTXT:
 	MOVE.W	FRAMESINDEX,D7
 	CMPI.W	#3,D7
 	BNE.W	.SKIP
 	MOVE.L	BGPLANE0,A4
 	LEA	FONT,A5
-	LEA	TEXT,A6
+	LEA	TEXT,A3
 	ADD.W	#bpl*(h-19)+1,A4	; POSITIONING
-	ADD.W	TEXTINDEX,A6
-	CMP.L	#_TEXT-1,A6	; Siamo arrivati all'ultima word della TAB?
+	ADD.W	TEXTINDEX,A3
+	CMP.L	#_TEXT-1,A3	; Siamo arrivati all'ultima word della TAB?
 	BNE.S	.PROCEED
 	MOVE.W	#0,TEXTINDEX	; Riparti a puntare dalla prima word
-	LEA	TEXT,A6		; FIX FOR GLITCH (I KNOW IT'S FUN... :)
+	LEA	TEXT,A3		; FIX FOR GLITCH (I KNOW IT'S FUN... :)
 	.PROCEED:
-	MOVE.B	(A6),D2		; Prossimo carattere in d2
+	MOVE.B	(A3),D2		; Prossimo carattere in d2
 	SUBI.B	#$20,D2		; TOGLI 32 AL VALORE ASCII DEL CARATTERE, IN
 	MULU.W	#8,D2		; MOLTIPLICA PER 8 IL NUMERO PRECEDENTE,
 	ADD.W	D2,A5
@@ -549,17 +531,13 @@ __POPULATETXTBUFFER:
 	CMPI.W	#0,D7
 	BEQ.W	.RESET
 	MOVE.W	D7,FRAMESINDEX
-	MOVEM.L	(SP)+,D0-A6	; FETCH FROM STACK
-	RTS
+	BRA.S	.SHIFTTEXT
 	.RESET:
 	ADDI.W	#1,TEXTINDEX
 	MOVE.W	#3,D7
 	MOVE.W	D7,FRAMESINDEX	; OTTIMIZZABILE
-	MOVEM.L	(SP)+,D0-A6	; FETCH FROM STACK
-	RTS
 
-__SHIFTTEXT:
-	MOVEM.L	D0-A6,-(SP)	; SAVE TO STACK
+	.SHIFTTEXT:
 	BSR.W	WaitBlitter
 	MOVE.L	BGPLANE0,A4
 	ADD.W	#bpl*(h-11),A4	; POSITIONING
@@ -569,13 +547,156 @@ __SHIFTTEXT:
 	MOVE.W	#%0000000000000010,BLTCON1	; BLTCON1 BIT 12 DESC MODE
 	MOVE.W	#3,BLTAMOD	; BLTAMOD =0 perche` il rettangolo
 	MOVE.W	#3,BLTDMOD	; BLTDMOD 40-4=36 il rettangolo
-
 	MOVE.L	A4,BLTAPTH	; BLTAPT  (fisso alla figura sorgente)
 	MOVE.L	A4,BLTDPTH
-
 	MOVE.W	#5*64+(w-10)/16,BLTSIZE	; BLTSIZE (via al blitter !)
+	RTS
 
-	MOVEM.L	(SP)+,D0-A6	; FETCH FROM STACK
+__POINT_SPRITES:			; #### Point LOGO sprites
+	LEA	COPPER1\.SpritePointers,A1
+	MOVE.L	#0,D0		; sprite 0
+	MOVE.W	D0,6(A1)
+	SWAP	D0
+	MOVE.W	D0,2(A1)
+
+	ADDQ.W	#8,A1
+	MOVE.L	#0,D0		; sprite 1
+	MOVE.W	D0,6(A1)
+	SWAP	D0
+	MOVE.W	D0,2(A1)
+
+	ADDQ.W	#8,A1
+	MOVE.L	#0,D0		; sprite 2
+	MOVE.W	D0,6(A1)
+	SWAP	D0
+	MOVE.W	D0,2(A1)
+
+	ADDQ.W	#8,A1
+	MOVE.L	#0,D0		; sprite 3
+	MOVE.W	D0,6(A1)
+	SWAP	D0
+	MOVE.W	D0,2(A1)
+
+	ADDQ.W	#8,A1
+	MOVE.L	#0,D0		; sprite 4
+	MOVE.W	D0,6(A1)
+	SWAP	D0
+	MOVE.W	D0,2(A1)
+
+	ADDQ.W	#8,A1
+	MOVE.L	#0,D0		; sprite 5
+	MOVE.W	D0,6(A1)
+	SWAP	D0
+	MOVE.W	D0,2(A1)
+
+	ADDQ.W	#8,A1
+	MOVE.L	#LED_ON,D0	; sprite 6
+	MOVE.W	D0,6(A1)
+	SWAP	D0
+	MOVE.W	D0,2(A1)
+
+	ADDQ.W	#8,A1
+	MOVE.L	#LED_OFF,D0	; sprite 7
+	MOVE.W	D0,6(A1)
+	SWAP	D0
+	MOVE.W	D0,2(A1)
+	RTS
+
+__NEGATIVE_COLORS:
+	LEA.L	COPPER1\.Palette,A2
+	LEA.L	COPPER2\.Palette,A3
+	.loop:
+	MOVE.L	(A2)+,D1
+	CMP.L	#$FFFFFFFE,D1	; END OF COPPERLIST
+	BEQ.S	.exit
+	CMP.L	#$01800000,D1	; BG COLOR UNCHANGED
+	BEQ.S	.skipWaits
+	CMP.W	#$FF00,D1
+	BEQ.S	.skipWaits
+	CMP.W	#$FC00,D1
+	BEQ.S	.skipWaits
+	CMP.W	#$0000,D1
+	BEQ.S	.skipWaits
+	CMP.W	#$FFFE,D1		; DONT CHANGE INSTRUCTIONS
+	BEQ.S	.skipWaits
+
+	MOVE.W	#$0FFF,D3	; TO MAKE COLOR NEGATIVE
+
+	MOVE.W	D1,D5	; R
+	MOVE.W	D1,D6	; G
+	MOVE.W	D1,D7	; B
+	LSR.W	#8,D5
+	LSL.W	#8,D6
+	LSR.W	#8,D6
+	LSR.W	#4,D6
+	ROR.W	#4,D7
+	LSR.W	#8,D7
+	LSR.W	#4,D7
+
+	CMP.B	#3,D5
+	BLT.S	.noRed
+	SUB.B	#3,D5	; TO MAKE IT LIGHTER
+	.noRed:
+	CMP.B	#3,D6
+	BLT.S	.noGreen
+	SUB.B	#3,D6	; TO MAKE IT LIGHTER
+	.noGreen:
+	CMP.B	#3,D7
+	BLT.S	.noBlue
+	SUB.B	#3,D7	; TO MAKE IT LIGHTER
+	.noBlue:
+
+	ROL.W	#8,D5
+	ROL.W	#4,D6
+	OR.W	D5,D6
+	OR.W	D6,D7
+
+	MOVE.W	D7,D1
+
+	SUB.W	D1,D3
+	MOVE.W	D3,D1
+	.skipWaits:
+	MOVE.L	D1,(A3)+
+	BRA.S	.loop
+	.exit:
+	RTS
+
+__POINT_COPPERLISTS:
+	MOVE.L	#COPPER1,D0
+	LEA	COPPER1\.CopJumpL,A0
+	MOVE.W	D0,(A0)
+	LEA	COPPER1\.CopJumpH,A0
+	SWAP	D0
+	MOVE.W	D0,(A0)
+	
+	MOVE.L	#COPPER1,D0
+	LEA	COPPER2\.CopJumpL,A0
+	MOVE.W	D0,(A0)
+	LEA	COPPER2\.CopJumpH,A0
+	SWAP	D0
+	MOVE.W	D0,(A0)
+
+	SWAP	D0
+	MOVE.W	#$8000,$DFF02A		; FROM EAB
+	MOVE.L	D0,COP1LC	; COP1LCH
+	RTS
+
+__STOP_STROBO:
+	MOVE.L	#COPPER1,D0
+	LEA	COPPER1\.CopJumpL,A0
+	MOVE.W	D0,(A0)
+	LEA	COPPER1\.CopJumpH,A0
+	SWAP	D0
+	MOVE.W	D0,(A0)
+	RTS
+
+__START_STROBO:
+	MOVE.L	#COPPER2,D0
+	LEA	COPPER1\.CopJumpL,A0
+	MOVE.W	D0,(A0)
+	LEA	COPPER1\.CopJumpH,A0
+	SWAP	D0
+	MOVE.W	D0,(A0)
 	RTS
 
 ;********** Fastmem Data **********
@@ -675,123 +796,8 @@ LED_OFF:
 	DC.W $0000,$0000,$0000,$0000,$0000,$0000
 	DC.W 0,0	; 2 word azzerate definiscono la fine dello sprite.
 
-COLS_NEG	= 0
-
-COPPER:
-	DC.W $1FC,0		; Slow fetch mode, remove if AGA demo.
-	DC.W $8E,$3061		; 238h display window top, left | DIWSTRT - 11.393
-	DC.W $90,$16D1		; and bottom, right.	| DIWSTOP - 11.457
-	DC.W $92,$28		; Standard bitplane dma fetch start
-	DC.W $94,$D8		; and stop eab.abime.net/showthread.php?t=69926
-	DC.W $106,$0C00		; (AGA compat. if any Dual Playf. mode)
-	DC.W $108,0		; bwid-bpl	;modulos
-	DC.W $10A,0		; bwid-bpl	;RISULTATO = 80 ?
-	DC.W $102,0		; SCROLL REGISTER (AND PLAYFIELD PRI)
-	DC.W $104,%0000000000100100	; BPLCON2
-	DC.W $100,bpls*$1000+$200	; enable bitplanes
-
-	.BplPtrs:
-	DC.W $E0,0
-	DC.W $E2,0
-	DC.W $E4,0
-	DC.W $E6,0
-	DC.W $E8,0
-	DC.W $EA,0
-	DC.W $EC,0
-	DC.W $EE,0
-	DC.W $F0,0
-	DC.W $F2,0
-	DC.W $F4,0
-	DC.W $F6,0	; full 6 ptrs, in case you increase bpls
-
-	.SpritePointers:
-	DC.W $120,0,$122,0 ; 0
-	DC.W $124,0,$126,0 ; 1
-	DC.W $128,0,$12A,0 ; 2
-	DC.W $12C,0,$12E,0 ; 3
-	DC.W $130,0,$132,0 ; 4
-	DC.W $134,0,$136,0 ; 5
-	DC.W $138,0,$13A,0 ; 6
-	DC.W $13C,0,$13E,0 ; 7
-
-	.Palette:
-	IFEQ COLS_NEG
-	DC.W $0180,$0000,$0182,$0853,$0184,$0BBB,$0186,$0D61
-	DC.W $0188,$0D88,$018A,$0667,$018C,$0556,$018E,$0FFF
-	DC.W $0190,$0EEE,$0192,$0DDD,$0194,$0CCD,$0196,$0CCC
-	DC.W $0198,$0AAA,$019A,$0999,$019C,$0888,$019E,$0777
-	DC.W $01A0,$0555,$01A2,$0444,$01A4,$0FF0,$01A6,$0EEF
-	DC.W $01A8,$0BBC,$01AA,$099A,$01AC,$0F0F,$01AE,$00FF
-	DC.W $01B0,$0CBA,$01B2,$0CA9,$01B4,$0778,$01B6,$000F
-	DC.W $01B8,$00F0,$01BA,$0B00,$01BC,$0632,$01BE,$0F00
-	ELSE
-	DC.W $0180,$0000,$0182,$09CD,$0184,$0666,$0186,$04BD
-	DC.W $0188,$0499,$018A,$0BBA,$018C,$0CCB,$018E,$0222
-	DC.W $0190,$0333,$0192,$0444,$0194,$0554,$0196,$0555
-	DC.W $0198,$0777,$019A,$0888,$019C,$0999,$019E,$0AAA
-	DC.W $01A0,$0CCC,$01A2,$0DDD,$01A4,$022D,$01A6,$0332
-	DC.W $01A8,$0665,$01AA,$0887,$01AC,$02D2,$01AE,$0D22
-	DC.W $01B0,$0567,$01B2,$0578,$01B4,$0AA9,$01B6,$0DD2
-	DC.W $01B8,$0D2D,$01BA,$06DD,$01BC,$0BDD,$01BE,$02DD
-	ENDC
-
-	; **** COPPERWAITS ****
-	.LOGO_COLORS:
-	DC.W $3001,$FF00		; ## START ##
-	DC.W $01B6,$0FFF		; WHITE
-	DC.W $01AC,$0BBC		; TRASP?
-	DC.W $01A4,$0FFF
-	DC.W $01BE,$0FFF		; TRASP?
-	DC.W $01B8,$0DDE		; TRASP?
-
-	DC.W $8001,$FF00		; ## SECOND PART TXT ##
-	DC.W $01A2,$0DDD
-	DC.W $0182,$0999		; TXT DARK
-	DC.W $0186,$0AAA		; TXT LIGHT
-	DC.W $01A6,$0DDD
-
-	DC.W $8601,$FF00		; ## KNOBS ##
-	DC.W $01AA,$0BBB
-	DC.W $0182,$0853		; TXT RESTORE
-	DC.W $0186,$0D61		; TXT RESTORE
-	DC.W $01A2,$0CCD
-	DC.W $01A6,$0EEF
-	DC.W $0198,$0999
-
-	DC.W $9401,$FF00		; ## TXT ##
-	DC.W $0182,$0999		; TXT DARK
-	DC.W $0186,$0AAA		; TXT LIGHT
-	DC.W $01AA,$0BBB
-	DC.W $01A6,$0DDD
-
-	DC.W $9A01,$FF00		; ## KNOBS ##
-	DC.W $0182,$0853		; TXT RESTORE
-	DC.W $0186,$0D61		; TXT RESTORE
-	DC.W $01A6,$0EEF
-
-	DC.W $B001,$FF00		; ## RESTORE ##
-	DC.W $01B6,$0000
-	DC.W $01BE,$0F00
-	DC.W $01A2,$0444
-	DC.W $01A6,$0EEF
-	DC.W $01AA,$099A
-	DC.W $0198,$0AAA
-
-	.SEQ_LED:
-	DC.W $F801,$FF00		; horizontal position masked off
-	DC.W $174,$FC00,$176,$FC00	; SPR6DATA
-	DC.W $17C,$0000,$17E,$FC00	; SPR7DATA
-	DC.W $FA01,$FF00
-	DC.W $174,$0000,$176,$0000	; SPR6DATA
-	DC.W $17C,$0000,$17E,$0000	; SPR7DATA
-
-	DC.W $FF01,$FF00		; horizontal position masked off
-	DC.W $018E,$0BBB		; SCROLLTEXT - $0D61
-
-	DC.W $FFDF,$FFFE		; allow VPOS>$ff
-
-	DC.W $FFFF,$FFFE		; magic value to end copperlist
-_COPPER:
+COPPER1:		INCLUDE "copperlist_common.i" _COPPER1:
+COPPER2:		INCLUDE "copperlist_common.i" _COPPER2:
 
 ;*******************************************************************************
 	SECTION	ChipBuffers,BSS_C	;BSS doesn't count toward exe size
