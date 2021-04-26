@@ -21,7 +21,7 @@ MARGINX=(w/2)
 MARGINY=(LOGOSIDE/2)
 TXT_FRMSKIP=3
 ;*************
-MODSTART_POS=8		; start music at position # !! MUST BE EVEN FOR 16BIT
+MODSTART_POS=2		; start music at position # !! MUST BE EVEN FOR 16BIT
 ;*************
 
 VarTimesTrig MACRO ;3 = 1 * 2, where 2 is cos(Angle)^(TrigShift*2) or sin(Angle)^(TrigShift*2)
@@ -122,7 +122,7 @@ MainLoop:
 
 	BSR.W	__FILLANDSCROLLTXT
 
-	MOVE.W	AUDIOCHLEVEL2,Z_POS
+	;MOVE.W	AUDIOCHLEVEL2,Z_POS
 
 	; ## SONG POS RESETS ##
 	MOVE.W	P61_Pos,D6
@@ -471,20 +471,29 @@ __SET_SEQUENCER_LEDS:
 __SET_PT_VISUALS:
 	; ## MOD VISUALIZERS ##########
 	; ## COMMANDS 80x TRIGGERED EVENTS ##
-	MOVE.W	P61_1F,D2		; 1Fx
-	CMPI.W	#$F,D2		; 1F4 - INVERT DIRECTION CH 3
-	BNE.S	.skip1
-	CLR.W	$100		; DEBUG | w 0 100 2
+	MOVE.W	P61_1F,D1		; 1Fx
+	CMPI.W	#$F,D1		; $F STROBO ON
+	BNE.S	.skip1F
 	BSR.W	__START_STROBO
 	MOVE.W	#0,P61_1F		; RESET FX
-	.skip1:
+	BRA.S	.skipAddAngle
+	.skip1F:
+	MULU.W	#2,D1
+	ADD.W	D1,ANGLE
+	.skipAddAngle:
+
 	MOVE.W	P61_E8,D2		; 80x
-	CMPI.W	#$F,D2		; 804 - INVERT DIRECTION CH 3
-	BNE.S	.skip2
+	CMPI.W	#$F,D2		; $F STROBO OFF
+	BNE.S	.skip80
 	BSR.W	__STOP_STROBO
 	MOVE.W	#0,P61_E8	; RESET FX
-	.skip2:
+	BRA.S	.skipSubAngle
+	.skip80:
+	MULU.W	#2,D2
+	SUB.W	D2,ANGLE
+	.skipSubAngle:
 	; ## COMMANDS 80x TRIGGERED EVENTS ##
+
 	; KICK
 	LEA	P61_visuctr2(PC),A0 ; which channel? 0-3
 	MOVEQ	#15,D0		; maxvalue
@@ -494,7 +503,6 @@ __SET_PT_VISUALS:
 	.ok1:
 	DIVU.W	#2,D0
 	MOVE.B	D0,AUDIOCHLEVEL2
-	;MOVE.W	D0,LOGOCOL1	; poke WHITE color now
 	_ok1:
 	RTS
 	; MOD VISUALIZERS *****
