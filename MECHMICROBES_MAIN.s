@@ -21,7 +21,7 @@ MARGINX=(w/2)
 MARGINY=(LOGOSIDE/2)
 TXT_FRMSKIP=3
 ;*************
-MODSTART_POS=8		; start music at position # !! MUST BE EVEN FOR 16BIT
+MODSTART_POS=0		; start music at position # !! MUST BE EVEN FOR 16BIT
 ;*************
 
 VarTimesTrig MACRO ;3 = 1 * 2, where 2 is cos(Angle)^(TrigShift*2) or sin(Angle)^(TrigShift*2)
@@ -467,26 +467,38 @@ __SET_PT_VISUALS:
 	; ## MOD VISUALIZERS ##########
 	; ## COMMANDS 80x TRIGGERED EVENTS ##
 	MOVE.W	P61_1F,D1		; 1Fx
+	MOVE.W	P61_E8,D2		; 80x
 	CMPI.W	#$F,D1		; $F STROBO ON
-	BNE.S	.skip1F
+	BNE.S	.skip1FF
 	BSR.W	__START_STROBO
 	MOVE.W	#0,P61_1F		; RESET FX
 	BRA.S	.skipAddAngle
-	.skip1F:
+	.skip1FF:
+
+	CMPI.W	#1,D1		; IF 1F & 80 EQUALS
+	BNE.S	.dontResetAngle
+	CMPI.W	#1,D2		; IF 1F & 80 EQUALS
+	BNE.S	.dontResetAngle
+	MOVE.W	#0,ANGLE		; RESET LOGO
+	MOVE.W	#0,P61_1F		; RESET FX
+	MOVE.W	#0,P61_E8	; RESET FX
+	BRA.S	.skipSubAngle
+	.dontResetAngle:
+
 	MULU.W	#2,D1
 	ADD.W	D1,ANGLE
 	.skipAddAngle:
 
-	MOVE.W	P61_E8,D2		; 80x
 	CMPI.W	#$F,D2		; $F STROBO OFF
-	BNE.S	.skip80
+	BNE.S	.skip80F
 	BSR.W	__STOP_STROBO
 	MOVE.W	#0,P61_E8	; RESET FX
 	BRA.S	.skipSubAngle
-	.skip80:
+	.skip80F:
 	MULU.W	#2,D2
 	SUB.W	D2,ANGLE
 	.skipSubAngle:
+
 	; ## COMMANDS 80x TRIGGERED EVENTS ##
 
 	; KICK
@@ -498,6 +510,13 @@ __SET_PT_VISUALS:
 	.ok1:
 	
 	MOVE.W	P61_LAST_POS,D1
+	CMPI.W	#$26,D1		; STOP AT END OF MUSIC
+	BNE.S	.dontStopMusic
+	MOVEM.L	D0-A6,-(SP)
+	JSR	P61_End
+	MOVEM.L	(SP)+,D0-A6
+	.dontStopMusic:
+
 	CMPI.W	#10,D1		; BDRUM FROM BLOCK 10
 	BLO.S	.skipZoom
 	MOVE.W	#MARGINY,TOP_MARGIN
