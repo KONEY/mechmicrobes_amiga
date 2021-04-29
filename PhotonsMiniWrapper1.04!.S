@@ -9,7 +9,7 @@ Start:
 	jsr -30(a6)		;enter Supervisor mode
 ;*--- save view+coppers ---*
 
-.yes68k:
+	.yes68k:
 	MOVE.L $78.W,A4		; or $6c(a0) with a0=vbrbase BY KONEY
 	lea .GfxLib(PC),a1		;either way return to here and open
 	jsr -408(a6)		;graphics library
@@ -57,19 +57,19 @@ Start:
 	jsr -222(a6)		;restore OS screen
 
 ;*--- close lib+exit ---*
-	;BSR.W type_end_txt	; TYPE SOMETHING ON EXIT by KONEY
+	BSR.W type_end_txt	; TYPE SOMETHING ON EXIT by KONEY
 	move.l a6,a1		;close graphics library
 	move.l 4.w,a6
 	jsr -414(a6)
-.quit:	
+	.quit:	
 	moveq #0,d0		;clear error return code to OS
 	rts			;back to AmigaDOS/Workbench.
 
-.GetVBR:
+	.GetVBR:
 	dc.w $4e7a,$c801		;hex for "movec VBR,a4"
 	rte			;return from Supervisor mode
 
-.GfxLib:
+	.GfxLib:
 	dc.b "graphics.library",0,0
 
 WaitEOF:				;wait for end of frame

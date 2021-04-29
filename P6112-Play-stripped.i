@@ -2942,6 +2942,7 @@ P61_finevdwn:
 	endc
 	ifne P61_timing
 P61_sete8:
+	move.w P61_Info(a5),d0
 	moveq #$f,d0
 	and.b P61_Info(a5),d0
 	move d0,P61_E8-P61_cn(a3)
@@ -3509,7 +3510,7 @@ P61_timerint:
 P61_InitPos:
 	dc.w 0
 	ifne use1Fx
-P61_PTrig: dc.w 0
+P61_PTrig: dc.w 0		;Poll this Custom trigger, using 'Bxx',pos $80-$ff
 P61_1F:	 dc.w 0
 	endc
 	ifne nowaveforms

@@ -2,8 +2,9 @@
 ;*** MiniStartup by Photon ***
 	INCDIR	"NAS:AMIGA/CODE/mechmicrobes_amiga/"
 	SECTION	"Code",CODE
-	INCLUDE	"PhotonsMiniWrapper1.04!.S"
 	INCLUDE	"custom-registers.i"
+	INCLUDE	"PhotonsMiniWrapper1.04!.S"
+	INCLUDE	"cli_output.s"
 	INCLUDE	"PT12_OPTIONS.i"
 	INCLUDE	"P6112-Play-stripped.i"
 ;********** Constants **********
@@ -265,6 +266,7 @@ MainLoop:
 	BTST	#2,$DFF016	; POTINP - RMB pressed?
 	BNE.W	MainLoop		; then loop
 	;*--- exit ---*
+	BSR.W	__SONG_POS_2_ASCII
 	;    ---  Call P61_End  ---
 	MOVEM.L D0-A6,-(SP)
 	JSR P61_End
@@ -510,7 +512,7 @@ __SET_PT_VISUALS:
 	.ok1:
 	
 	MOVE.W	P61_LAST_POS,D1
-	CMPI.W	#$26,D1		; STOP AT END OF MUSIC
+	CMPI.W	#$38,D1		; STOP AT END OF MUSIC
 	BNE.S	.dontStopMusic
 	MOVEM.L	D0-A6,-(SP)
 	JSR	P61_End
@@ -728,6 +730,24 @@ __START_STROBO:
 	MOVE.W	D0,(A0)
 	RTS
 
+__SONG_POS_2_ASCII:
+	; ## TRANSFORM SONGPOS INTO ASCII TXT  ##
+	MOVE.W	P61_LAST_POS,D5
+	ADDQ.W	#1,D5		; DONT SHOW 0 TO USER
+	CLR.L	D6
+	MOVE.W	D5,D6
+	DIVU.W	#$A,D6
+	SWAP	D6
+	MOVE.W	D6,D5
+	SWAP	D6
+	OR.B	#48,D6		; POINT TO CHAR 0
+	LSL.W	#8,D6
+	OR.B	#48,D5		; POINT TO CHAR 0
+	OR.W	D6,D5
+	MOVE.W	D5,TXT_POS
+	RTS
+	; ## TRANSFORM SONGPOS INTO ASCII TXT  ##
+
 ;********** Fastmem Data **********
 	INCLUDE	"sincosin_table.i"	; VALUES
 
@@ -747,6 +767,7 @@ Y_TEMP:		DC.W 0
 XY_INIT:		DC.W 0
 TEXTINDEX:	DC.W 0
 FRAMESINDEX:	DC.W 3
+END_TEXT_LEN:	DC.W 152
 
 ZOOM_VALUES:	DC.B 70,67,65,62,48,44,40,36,32,28,24,20,16,12,8,5,3
 		EVEN
@@ -782,6 +803,10 @@ BITPLANE_PTR:	DC.L TR909+(bpl*h*4)	; +(bpl/2)-(LOGOBPL/2)
 DrawBuffer:	DC.L SCREEN2		; pointers to buffers
 ViewBuffer:	DC.L SCREEN1		; to be swapped
 
+FONT:		DC.L 0,0			; SPACE CHAR
+		INCBIN "cosmicalien_font.raw",0
+		EVEN
+
 TEXT:	DC.B "!!WARNING!! - EPILEPSY DANGER AHEAD!!   SERIOUSLY... :)    "
 	DC.B "WELCOME TO:   ### MECHMICROBES ###   KONEY'S FOURTH AMIGA HARDCORE RELEASE!   "
 	DC.B "THIS TEXT IS DUMMY TEXT, IT SAYS NOTHING, IT'S JUST A PLACEHOLDER... "
@@ -790,8 +815,12 @@ TEXT:	DC.B "!!WARNING!! - EPILEPSY DANGER AHEAD!!   SERIOUSLY... :)    "
 	EVEN
 _TEXT:
 
-FONT:		DC.L 0,0			; SPACE CHAR
-		INCBIN "cosmicalien_font.raw",0
+END_TEXT:	DC.B "THANKS FOR EXECUTING MECHMICROBES BY KONEY!",10
+		DC.B "YOU REACHED BLOCK "
+		TXT_POS: DC.B "  "
+		DC.B " FROM A SEQUENCE OF 75.",10
+		DC.B "VISIT WWW.KONEY.ORG FOR MORE TECHNO "
+		DC.B "AND HARDCORE AMIGA STUFF!",10
 		EVEN
 
 	SECTION	ChipData,DATA_C	;declared data that must be in chipmem
