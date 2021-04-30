@@ -22,7 +22,7 @@ MARGINX=(w/2)
 MARGINY=(LOGOSIDE/2)
 TXT_FRMSKIP=3
 ;*************
-MODSTART_POS=0		; start music at position # !! MUST BE EVEN FOR 16BIT
+MODSTART_POS=0	; start music at position # !! MUST BE EVEN FOR 16BIT
 ;*************
 
 VarTimesTrig MACRO ;3 = 1 * 2, where 2 is cos(Angle)^(TrigShift*2) or sin(Angle)^(TrigShift*2)
@@ -465,7 +465,6 @@ __SET_PT_VISUALS:
 	ADDQ.W	#1,P61_LAST_POS
 	.dontReset:
 	; ## SONG POS RESETS ##
-
 	; ## MOD VISUALIZERS ##########
 	; ## COMMANDS 80x TRIGGERED EVENTS ##
 	MOVE.W	P61_1F,D1		; 1Fx
@@ -476,7 +475,6 @@ __SET_PT_VISUALS:
 	MOVE.W	#0,P61_1F		; RESET FX
 	BRA.S	.skipAddAngle
 	.skip1FF:
-
 	CMPI.W	#1,D1		; IF 1F & 80 EQUALS
 	BNE.S	.dontResetAngle
 	CMPI.W	#1,D2		; IF 1F & 80 EQUALS
@@ -512,7 +510,7 @@ __SET_PT_VISUALS:
 	.ok1:
 	
 	MOVE.W	P61_LAST_POS,D1
-	CMPI.W	#$38,D1		; STOP AT END OF MUSIC
+	CMPI.W	#76,D1		; STOP AT END OF MUSIC
 	BNE.S	.dontStopMusic
 	MOVEM.L	D0-A6,-(SP)
 	JSR	P61_End
@@ -817,13 +815,13 @@ _TEXT:
 
 END_TEXT:	DC.B "THANKS FOR EXECUTING MECHMICROBES BY KONEY!",10
 		DC.B "YOU REACHED BLOCK "
-		TXT_POS: DC.B "  "
-		DC.B " FROM A SEQUENCE OF 75.",10
+		TXT_POS: DC.B "XX"
+		DC.B " FROM A SEQUENCE OF 75. ",10
 		DC.B "VISIT WWW.KONEY.ORG FOR MORE TECHNO "
 		DC.B "AND HARDCORE AMIGA STUFF!",10
 		EVEN
 
-	SECTION	ChipData,DATA_C	;declared data that must be in chipmem
+	SECTION "ChipData",DATA_C	;declared data that must be in chipmem
 
 TR909:		INCBIN "TR-909_368x230x5.raw"
 MODULE:		INCBIN "mechmicrobes.P61"	; code $B000

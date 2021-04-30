@@ -25,6 +25,7 @@ type_end_txt:
 ; * ora Output di testo:
 	move.l	d4,d1		; Handle di Output
 	move.l	#END_TEXT,d2	; Indirizzo del Testo
+	CLR.L	D3
 	move.w	END_TEXT_LEN,d3		; Lunghezza del testo
 	move.l	_DOSBase,a6	; DOS di base
 	jsr	-48(a6)		; Funzione "Scrittura"
