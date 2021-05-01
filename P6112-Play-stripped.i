@@ -2598,7 +2598,7 @@ P61_nonewpatt:
 	ifne useinsnum
 P61_setCurINS:	; ## KONEY ##
 	MOVE.W	P61_SN_Note(A5),D0
-	AND.W	#$00F0,D0	; MASK SECOND NYBBLE
+	AND.W	#$00F0,D0	; MASK SECOND NIBBLE
 	ROR.W	#4,D0		; MSB of sample #
 	MOVE.W	#P61_CH3_INS-P61_cn,D2
 	ADD.W	D5,D2		; D5 = TRACK# 3-0

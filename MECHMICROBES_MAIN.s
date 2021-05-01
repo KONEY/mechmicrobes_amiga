@@ -8,11 +8,11 @@
 	INCLUDE	"PT12_OPTIONS.i"
 	INCLUDE	"P6112-Play-stripped.i"
 ;********** Constants **********
-wd	EQU	368		;screen width, height, depth
+wd	EQU	368		; screen width, height, depth
 hg	EQU	230
-bpls	EQU	5		;handy values:
-bwpl	EQU	wd/16*2		;byte-width of 1 bitplane line (46)
-bwid	EQU	bpls*bwpl		;byte-width of 1 pixel line (all bpls)
+bpls	EQU	5		; handy values:
+bwpl	EQU	wd/16*2		; byte-width of 1 bitplane line (46)
+bwid	EQU	bpls*bwpl		; byte-width of 1 pixel line (all bpls)
 TrigShift	EQU	7
 PXLSIDE	EQU	16
 Z_Shift	EQU	PXLSIDE*5/2	; 5x5 obj
@@ -22,10 +22,10 @@ MARGINX	EQU	(wd/2)
 MARGINY	EQU	(LOGOSIDE/2)
 TXT_FRMSKIP EQU	3
 ;*************
-MODSTART_POS EQU	8	; start music at position # !! MUST BE EVEN FOR 16BIT
+MODSTART_POS EQU	10	; start music at position # !! MUST BE EVEN FOR 16BIT
 ;*************
 
-VarTimesTrig MACRO ;3 = 1 * 2, where 2 is cos(Angle)^(TrigShift*2) or sin(Angle)^(TrigShift*2)
+VarTimesTrig MACRO ; 3 = 1 * 2, where 2 is cos(Angle)^(TrigShift*2) or sin(Angle)^(TrigShift*2)
 	move.l \1,\3
 	muls \2,\3
 
@@ -806,13 +806,7 @@ FONT:		DC.L 0,0			; SPACE CHAR
 		INCBIN "cosmicalien_font.raw",0
 		EVEN
 
-TEXT:	DC.B "!!WARNING!! - EPILEPSY DANGER AHEAD!!   SERIOUSLY... :)    "
-	DC.B "WELCOME TO:   ### MECHMICROBES ###   KONEY'S FOURTH AMIGA HARDCORE RELEASE!   "
-	DC.B "THIS TEXT IS DUMMY TEXT, IT SAYS NOTHING, IT'S JUST A PLACEHOLDER... "
-	DC.B "ONLY FOR TESTING! - MAKE SURE TO VISIT WWW.KONEY.ORG FOR MORE INDUSTRIAL "
-	DC.B "AMIGACORE!!            .EOF                                                              "
-	EVEN
-_TEXT:
+TEXT:		INCLUDE "TEXTSCROLLER.i"
 
 END_TEXT:	DC.B "THANKS FOR EXECUTING MECHMICROBES BY KONEY!",10
 		DC.B "YOU REACHED BLOCK "
