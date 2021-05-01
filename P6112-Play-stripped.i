@@ -108,6 +108,7 @@ bitdef:	macro
 	endm
 library_minimum:	equ 33
 	endc
+
 	structure Player_Header,0
 	ulong P61_InitOffset
 	ulong P61_MusicOffset
@@ -127,6 +128,7 @@ library_minimum:	equ 33
 	aptr P61_Cha2Offset
 	aptr P61_Cha3Offset
 	label Player_Header_SIZE
+
 	structure Channel_Block,0
 	ubyte P61_SN_Note
 	ubyte P61_Command
@@ -165,6 +167,7 @@ library_minimum:	equ 33
 	endc
 	uword P61_DMABit
 	label Channel_Block_Size
+
 	structure Sample_Block,0
 	aptr P61_SampleOffset
 	uword P61_SampleLength
@@ -173,6 +176,7 @@ library_minimum:	equ 33
 	uword P61_SampleVolume
 	uword P61_FineTune
 	label Sample_Block_SIZE
+
 P61_ft=usecode&1
 P61_pu=usecode&2
 P61_pd=usecode&4
@@ -202,6 +206,7 @@ P61_nc=usecode&$10000000
 P61_nd=usecode&$20000000
 P61_pde=usecode&$40000000
 P61_il=usecode&$80000000
+
 	endc
 	ifne asmonereport
 	printt ""
@@ -2352,6 +2357,9 @@ P61_playtimeCont:
 	endr
 	endc
 	dc P61_fxdone-.j
+	ifne useinsnum
+	dc P61_setCurINS-.j	; NEW ROUTINE BY KONEY
+	endc
 	ifne use1Fx
 	dc P61_Trigger-.j
 	else
@@ -2427,6 +2435,9 @@ P61_loscont:
 	move P61_jtab(PC,d0),d0
 	jmp P61_jtab(PC,d0)
 P61_fxdone:
+	;CLR.W	$100		; DEBUG | w 0 100 2
+	;move.w P61_SN_Note(a5),d0
+	;move.w d0,P61_KONEY-P61_cn(a3)
 	moveq #$7e,d0
 	and.b (a5),d0
 	beq.b P61_nocha
@@ -2486,7 +2497,7 @@ P61_chansdone:
 	bpl.b .noch3
 	move.w d7,$da-C(A6)
 .noch3:	add.b d5,d5
-	bpl.b .noch2
+	bpl.b .noch2vi
 	move.w d7,$ca-C(A6)
 .noch2:	add.b d5,d5
 	bpl.b .noch1
@@ -2584,18 +2595,29 @@ P61_nonewpatt:
 	move d0,P61_CRow-P61_cn(a3)
 	endc
 	rts
+	ifne useinsnum
+P61_setCurINS:	; ## KONEY ##
+	MOVE.W	P61_SN_Note(A5),D0
+	AND.W	#$00F0,D0	; MASK SECOND NYBBLE
+	ROR.W	#4,D0		; MSB of sample #
+	MOVE.W	#P61_CH3_INS-P61_cn,D2
+	ADD.W	D5,D2		; D5 = TRACK# 3-0
+	ADD.W	D5,D2		; TWO ADDS ARE FASTER THAN MULU :)
+	MOVE.w	D0,(A3,D2.W)
+	BRA.W	P61_fxdone
+	endc		; ## KONEY ##
 	ifne use1Fx
 P61_Trigger:
-	move.b P61_Info(a5),d0
-	cmp.b #$f0,d0
-	blo.w P61_fxdone
+	move.b	P61_Info(a5),d0
+	cmp.b	#$f0,d0
+	blo.w	P61_fxdone
 	; ## KONEY FIX ##
-	MOVEQ #$F,D0			; Taken from P61_sete8
-	AND.B P61_Info(A5),D0		; now returns value
-	MOVE D0,P61_1F-P61_cn(A3)		; before only 1F
+	MOVEQ	#$F,D0			; Taken from P61_sete8
+	AND.B	P61_Info(A5),D0		; now returns value
+	MOVE.W	D0,P61_1F-P61_cn(A3)	; before only 1F
 	; ## KONEY FIX ##
-	;move.w d0,P61_PTrig+1-P61_cn(a3)	; Original line of code
-	bra.w P61_fxdone
+	;move.w	d0,P61_PTrig+1-P61_cn(a3)	; Original line of code
+	bra.w	P61_fxdone
 	endc
 	ifne P61_tp
 P61_settoneport:
@@ -2942,7 +2964,6 @@ P61_finevdwn:
 	endc
 	ifne P61_timing
 P61_sete8:
-	move.w P61_Info(a5),d0
 	moveq #$f,d0
 	and.b P61_Info(a5),d0
 	move d0,P61_E8-P61_cn(a3)
@@ -3512,6 +3533,12 @@ P61_InitPos:
 	ifne use1Fx
 P61_PTrig: dc.w 0		;Poll this Custom trigger, using 'Bxx',pos $80-$ff
 P61_1F:	 dc.w 0
+	endc
+	ifne useinsnum
+P61_CH3_INS:	DC.W 0	; here sample # are stored to use outside
+P61_CH2_INS:	DC.W 0
+P61_CH1_INS:	DC.W 0
+P61_CH0_INS:	DC.W 0
 	endc
 	ifne nowaveforms
 P61_NewDMA:	dc.w 0

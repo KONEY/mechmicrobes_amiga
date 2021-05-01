@@ -1,16 +1,16 @@
-;		#-----+-----------------------------------------#
-;		|Name:|    	P6112 Example Source		|
-;		+-----+-----------------------------------------+
-;		|V1.06|	P6112,E1x/E2x fix			|
-;		|V1.05|	P6111,Edx fix,init/exit patch,Dxx note. |
-;		|V1.04|	P6110 final, E6x command fix+new option	|
-;		|V1.03|	Final, compatibility changes only.	|
-;		|V1.02|	Made more user friendly			|
-;		|V1.01|	Plays the example P61 song until you 	|
-;		|     |	press the left mouse button.		|
-;		+-----+-----------------------------------------+
-;		|	    	 Photon/Scoopex 		|
-;		#-----------------------------------------------#
+;#-----+-----------------------------------------#
+;|Name:|    	P6112 Example Source	|
+;+-----+-----------------------------------------+
+;|V1.06|	P6112,E1x/E2x fix			|
+;|V1.05|	P6111,Edx fix,init/exit patch,Dxx note. |
+;|V1.04|	P6110 final, E6x command fix+new option |
+;|V1.03|	Final, compatibility changes only.	|
+;|V1.02|	Made more user friendly		|
+;|V1.01|	Plays the example P61 song until you 	|
+;|     |	press the left mouse button.	|
+;+-----+-----------------------------------------+
+;|	    	 Photon/Scoopex 		|
+;#-----------------------------------------------#
 
 ;Tutorial here: http://youtu.be/xBtHO-IuN9E
 ;Put it in your demo: http://youtu.be/JYLcIR6tyO4
@@ -55,18 +55,14 @@
 ;-------------------------
 ; 1	CIA mode. Plays any song. Uses the CIA interrupt.
 ;	 - (default, P61_Music should not be called, easiest to use)
-
 ; 2	VBLANK mode. No F20 or higher commands must be used in the song.
 ;	 - (use when you want to decide when P61_Music should be called.)
-
 ; 3	COPPER mode. No F20 or higher commands must be used in the song.
 ;	 - (requires a timed call to P61_Music and a timed copper command 
 ;	    11 scanlines later to set sound DMA.)
-
 ; 4	MAXOPTI mode. No F20 or higher commands must be used in the song.
 ;	 - (requires a timed call to P61_Music and a timed copper command 
 ;	    11 scanlines later to set sound DMA. Maximum optimized.)
-
 
 P61mode	=1	;Try other modes ONLY IF there are no Fxx commands >= 20.
 		;(f.ex., P61.new_ditty only works with P61mode=1)
@@ -148,17 +144,21 @@ use1Fx	=1	;Optional extra effect-sync trigger (*). If your module is free
 		;also use this as an extra sync command if E8x is not enough, 
 		;of course.)
 
-;(*) Slideup values>116 causes bugs in Protracker, and E8 causes extra-code 
-;for all E-commands, so I used this. It's only faster if your song contains 0
-;E-commands, so it's only useful to a few, I guess. Bit of cyclemania. :)
+		;(*) Slideup values>116 causes bugs in Protracker, and E8 causes extra-code 
+		;for all E-commands, so I used this. It's only faster if your song contains 0
+		;E-commands, so it's only useful to a few, I guess. Bit of cyclemania. :)
 
-;Just like E8x, you will get the trigger after the P61_Music call, 1 frame 
-;BEFORE it's heard. This is good, because it allows double-buffered graphics 
-;or effects running at < 50 fps to show the trigger synced properly.
+		;Just like E8x, you will get the trigger after the P61_Music call, 1 frame 
+		;BEFORE it's heard. This is good, because it allows double-buffered graphics 
+		;or effects running at < 50 fps to show the trigger synced properly.
+
+useinsnum	=1	;BY KONEY
+		;saves to P61_CHx_INS the number of sample being player in 
+		;corrisponding channel. Only first nibble, so only up to $F/16
+		;Use with visuctrs for even more sync options
 
 
 ;;    ---  CIA mode options (default) ---
-
 	ifeq P61mode-1
 
 p61cia	=1	;call P61_Music on the CIA interrupt instead of every frame.

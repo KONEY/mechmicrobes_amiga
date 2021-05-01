@@ -8,21 +8,21 @@
 	INCLUDE	"PT12_OPTIONS.i"
 	INCLUDE	"P6112-Play-stripped.i"
 ;********** Constants **********
-w=368		;screen width, height, depth
-h=230
-bpls=5		;handy values:
-bpl=w/16*2	;byte-width of 1 bitplane line (46)
-bwid=bpls*bpl	;byte-width of 1 pixel line (all bpls)
-TrigShift=7
-PXLSIDE=16
-Z_Shift=PXLSIDE*5/2	; 5x5 obj
-LOGOSIDE=16*7
-LOGOBPL=LOGOSIDE/16*2
-MARGINX=(w/2)
-MARGINY=(LOGOSIDE/2)
-TXT_FRMSKIP=3
+wd	EQU	368		;screen width, height, depth
+hg	EQU	230
+bpls	EQU	5		;handy values:
+bwpl	EQU	wd/16*2		;byte-width of 1 bitplane line (46)
+bwid	EQU	bpls*bwpl		;byte-width of 1 pixel line (all bpls)
+TrigShift	EQU	7
+PXLSIDE	EQU	16
+Z_Shift	EQU	PXLSIDE*5/2	; 5x5 obj
+LOGOSIDE	EQU	16*7
+LOGOBPL	EQU	LOGOSIDE/16*2
+MARGINX	EQU	(wd/2)
+MARGINY	EQU	(LOGOSIDE/2)
+TXT_FRMSKIP EQU	3
 ;*************
-MODSTART_POS=0	; start music at position # !! MUST BE EVEN FOR 16BIT
+MODSTART_POS EQU	8	; start music at position # !! MUST BE EVEN FOR 16BIT
 ;*************
 
 VarTimesTrig MACRO ;3 = 1 * 2, where 2 is cos(Angle)^(TrigShift*2) or sin(Angle)^(TrigShift*2)
@@ -50,12 +50,12 @@ Demo:				; a4=VBR, a6=Custom Registers Base addr
 	;*--- start copper ---*
 	LEA	SCREEN1,A0
 
-	MOVEQ	#bpl,D0
+	MOVEQ	#bwpl,D0
 	LEA	COPPER1\.BplPtrs+2,A1
 	MOVEQ	#bpls-1,D1
 	BSR.W	PokePtrs
 
-	MOVEQ	#bpl,D0
+	MOVEQ	#bwpl,D0
 	LEA	COPPER2\.BplPtrs+2,A1
 	MOVEQ	#bpls-1,D1
 	BSR.W	PokePtrs
@@ -102,14 +102,14 @@ MainLoop:
 	movem.l	a2-a3,DrawBuffer	;draw into a2, show a3
 	;*--- show one... ---*
 	move.l	a3,a0
-	move.l	#bpl*h,d0
+	move.l	#bwpl*hg,d0
 	lea	COPPER1\.BplPtrs+2,a1
 	moveq	#bpls-1,d1
 	bsr.w	PokePtrs
 
 	move.l	a3,a0
-	ADD.L	#bpl,A0		; Oppure aggiungi la lunghezza di una linea
-	move.l	#bpl*h,d0
+	ADD.L	#bwpl,A0		; Oppure aggiungi la lunghezza di una linea
+	move.l	#bwpl*hg,d0
 	lea	COPPER2\.BplPtrs+2,a1
 	moveq	#bpls-1,d1
 	bsr.w	PokePtrs
@@ -289,7 +289,7 @@ ClearScreen:			; a1=screen destination address to clear
 	clr.w	BLTDMOD			; destination modulo
 	move.l	#$01000000,BLTCON0		; set operation type in BLTCON0/1
 	move.l	a1,BLTDPTH		; destination address
-	move.l	#h*bpls*64+bpl/2,BLTSIZE	;blitter operation size
+	move.l	#hg*bpls*64+bwpl/2,BLTSIZE	;blitter operation size
 	rts
 VBint:				; Blank template VERTB interrupt
 	btst	#5,$DFF01F	; check if it's our vertb int.
@@ -307,7 +307,7 @@ ClearBlitterBuffer:
 	MOVE.W	#0,BLTDMOD		; Init modulo Dest D
 	MOVE.L	#EMPTY,BLTAPTH		; Source
 	MOVE.L	#BUFFER3D,BLTDPTH		; Dest
-	MOVE.W	#w*64+LOGOSIDE/16,BLTSIZE	; Start Blitter (Blitsize)
+	MOVE.W	#wd*64+LOGOSIDE/16,BLTSIZE	; Start Blitter (Blitsize)
 	RTS
 Drawline:
 	LEA	BUFFER3D,A0
@@ -323,7 +323,7 @@ Drawline:
 	add.w	d3,d1	; mette in D1 la Y piu` piccola
 	neg.w	d3	; D3=DY
 	.y2gy1:
-	mulu.w	#bpl,d1		; offset Y
+	mulu.w	#bwpl,d1		; offset Y
 	add.l	d1,a0
 	moveq	#0,d1		; D1 indice nella tabella ottanti
 	sub.w	d0,d2		; D2=X2-X1
@@ -396,8 +396,8 @@ InitLine:
 	moveq.l	#-1,d5
 	move.l	d5,BLTAFWM	; BLTAFWM/BLTALWM = $FFFF
 	move.w	#$8000,BLTADAT	; BLTADAT = $8000
-	move.w	#bpl,BLTCMOD	; BLTCMOD = 40
-	move.w	#bpl,BLTDMOD	; BLTDMOD = 40
+	move.w	#bwpl,BLTCMOD	; BLTCMOD = 40
+	move.w	#bwpl,BLTDMOD	; BLTDMOD = 40
 	rts
 
 __ROTATE:
@@ -414,20 +414,20 @@ __ROTATE:
 	RTS
 
 __BLIT_3D_IN_PLACE:
-	BSR	WaitBlitter
+	BSR.W	WaitBlitter
 	MOVE.W	#$FFFF,BLTAFWM		; BLTAFWM lo spiegheremo dopo
 	MOVE.W	#$FFFF,BLTALWM		; BLTALWM lo spiegheremo dopo
 	MOVE.W	#%0000100111110000,BLTCON0	; BLTCON0 (usa A+D)
 	;MOVE.W	#%0000000000001010,BLTCON1	; BLTCON1 lo spiegheremo dopo
 	MOVE.W	#%0000000000010010,BLTCON1	; BLTCON1 lo spiegheremo dopo
-	MOVE.W	#bpl-LOGOBPL,BLTAMOD	; BLTAMOD =0 perche` il rettangolo
-	MOVE.W	#bpl-LOGOBPL,BLTDMOD	; Init modulo Dest D
+	MOVE.W	#bwpl-LOGOBPL,BLTAMOD	; BLTAMOD =0 perche` il rettangolo
+	MOVE.W	#bwpl-LOGOBPL,BLTDMOD	; Init modulo Dest D
 	MOVE.L	#BUFFER3D,A4
-	ADD.L	#bpl/2-LOGOBPL/2,A4
+	ADD.L	#bwpl/2-LOGOBPL/2,A4
 	ADD.L	#(LOGOSIDE+16)*40-2,A4	; FOR DESC MODE - WHY THIS VALUES??
 	MOVE.L	A4,BLTAPTH		; BLTAPT  (fisso alla figura sorgente)
 	MOVE.L	BITPLANE_PTR,A4
-	ADD.L	#bpl/2-LOGOBPL/2,A4
+	ADD.L	#bwpl/2-LOGOBPL/2,A4
 	ADD.L	#(LOGOSIDE+16)*40-2,A4	; FOR DESC MODE - WHY THIS VALUES??
 	MOVE.L	A4,BLTDPTH
 	MOVE.W	#LOGOSIDE*64+LOGOSIDE/16,BLTSIZE	; Start Blitter (Blitsize)
@@ -465,6 +465,7 @@ __SET_PT_VISUALS:
 	ADDQ.W	#1,P61_LAST_POS
 	.dontReset:
 	; ## SONG POS RESETS ##
+
 	; ## MOD VISUALIZERS ##########
 	; ## COMMANDS 80x TRIGGERED EVENTS ##
 	MOVE.W	P61_1F,D1		; 1Fx
@@ -485,7 +486,7 @@ __SET_PT_VISUALS:
 	BRA.S	.skipSubAngle
 	.dontResetAngle:
 
-	MULU.W	#2,D1
+	ADD.W	D1,ANGLE		; WE OPTIMIZE :)
 	ADD.W	D1,ANGLE
 	.skipAddAngle:
 
@@ -495,13 +496,12 @@ __SET_PT_VISUALS:
 	MOVE.W	#0,P61_E8	; RESET FX
 	BRA.S	.skipSubAngle
 	.skip80F:
-	MULU.W	#2,D2
+	SUB.W	D2,ANGLE		; WE OPTIMIZE :)
 	SUB.W	D2,ANGLE
 	.skipSubAngle:
-
 	; ## COMMANDS 80x TRIGGERED EVENTS ##
 
-	; KICK
+	; ## KICK FX - SAMPLE#3 - KICK10.WAV ON CH1
 	LEA	P61_visuctr1(PC),A0 ; which channel? 0-3
 	MOVEQ	#15,D0		; maxvalue
 	SUB.W	(A0),D0		; -#frames/irqs since instrument trigger
@@ -517,7 +517,8 @@ __SET_PT_VISUALS:
 	MOVEM.L	(SP)+,D0-A6
 	.dontStopMusic:
 
-	CMPI.W	#10,D1		; BDRUM FROM BLOCK 10
+	MOVE.W	P61_CH1_INS,D1	; NEW VALUES FROM P61
+	CMPI.W	#3,D1		; BDRUM FROM BLOCK 10
 	BLO.S	.skipZoom
 	MOVE.W	#MARGINY,TOP_MARGIN
 	LEA	ZOOM_VALUES,A0
@@ -535,7 +536,7 @@ __FILLANDSCROLLTXT:
 	MOVE.L	BGPLANE0,A4
 	LEA	FONT,A5
 	LEA	TEXT,A3
-	ADD.W	#bpl*(h-19)+1,A4	; POSITIONING
+	ADD.W	#bwpl*(hg-19)+1,A4	; POSITIONING
 	ADD.W	TEXTINDEX,A3
 	CMP.L	#_TEXT-1,A3	; Siamo arrivati all'ultima word della TAB?
 	BNE.S	.PROCEED
@@ -549,11 +550,11 @@ __FILLANDSCROLLTXT:
 	MOVEQ	#0,D6		; RESET D6
 	MOVE.B	#8-1,D6
 	.LOOP:
-	ADD.W	#bpl-2,A4		; POSITIONING
+	ADD.W	#bwpl-2,A4		; POSITIONING
 	MOVE.B	(A5)+,(A4)+
 	MOVE.B	#%00000000,(A4)+	; WRAPS MORE NICELY?
 	DBRA	D6,.LOOP
-	ADD.W	#bpl*2-2,A4	; POSITIONING
+	ADD.W	#bwpl*2-2,A4	; POSITIONING
 	MOVE.B	#%00000000,(A4)	; WRAPS MORE NICELY?
 	.SKIP:
 	SUBI.W	#1,D7
@@ -569,7 +570,7 @@ __FILLANDSCROLLTXT:
 	.SHIFTTEXT:
 	BSR.W	WaitBlitter
 	MOVE.L	BGPLANE0,A4
-	ADD.W	#bpl*(h-11),A4	; POSITIONING
+	ADD.W	#bwpl*(hg-11),A4	; POSITIONING
 	MOVE.W	#$FFFF,BLTAFWM	; BLTAFWM lo spiegheremo dopo
 	MOVE.W	#$000F,BLTALWM	; BLTALWM lo spiegheremo dopo
 	MOVE.W	#%0010100111110000,BLTCON0	; BLTCON0 (usa A+D); con shift di un pixel
@@ -578,7 +579,7 @@ __FILLANDSCROLLTXT:
 	MOVE.W	#3,BLTDMOD	; BLTDMOD 40-4=36 il rettangolo
 	MOVE.L	A4,BLTAPTH	; BLTAPT  (fisso alla figura sorgente)
 	MOVE.L	A4,BLTDPTH
-	MOVE.W	#5*64+(w-10)/16,BLTSIZE	; BLTSIZE (via al blitter !)
+	MOVE.W	#5*64+(wd-10)/16,BLTSIZE	; BLTSIZE (via al blitter !)
 	RTS
 
 __POINT_SPRITES:			; #### Point LOGO sprites
@@ -654,8 +655,8 @@ __NEGATIVE_COLORS:
 	MOVE.W	D1,D5	; R
 	MOVE.W	D1,D6	; G
 	MOVE.W	D1,D7	; B
-	LSR.W	#8,D5
-	LSL.W	#8,D6
+	LSR.W	#8,D5	; THIS IS SHAMEFUL
+	LSL.W	#8,D6	; BUT I'M IN HURRY :)
 	LSR.W	#8,D6
 	LSR.W	#4,D6
 	ROR.W	#4,D7
@@ -793,11 +794,11 @@ SEQ_POS_BIT:	DC.B $1,$1,$0,$1,$0,$0,$1,$1,$0,$0,$1,$0,$1,$0,$1,$1
 SEQ_POS_OFF:	DC.B $47,$00,$00,$00,$70,$00,$00,$00,$99,$00,$00,$00,$C2,$00,$00,$00
 
 BGPLANE0:		DC.L TR909
-BGPLANE1:		DC.L TR909+bpl*h
-BGPLANE2:		DC.L TR909+bpl*h*2
-BGPLANE3:		DC.L TR909+bpl*h*3
-BGPLANE4:	DC.L TR909+bpl*h*3
-BITPLANE_PTR:	DC.L TR909+(bpl*h*4)	; +(bpl/2)-(LOGOBPL/2)
+BGPLANE1:		DC.L TR909+bwpl*hg
+BGPLANE2:		DC.L TR909+bwpl*hg*2
+BGPLANE3:		DC.L TR909+bwpl*hg*3
+BGPLANE4:	DC.L TR909+bwpl*hg*3
+BITPLANE_PTR:	DC.L TR909+(bwpl*hg*4)	; +(bwpl/2)-(LOGOBPL/2)
 DrawBuffer:	DC.L SCREEN2		; pointers to buffers
 ViewBuffer:	DC.L SCREEN1		; to be swapped
 
@@ -862,8 +863,8 @@ COPPER2:		INCLUDE "copperlist_common.i" _COPPER2:
 	SECTION	ChipBuffers,BSS_C	;BSS doesn't count toward exe size
 ;*******************************************************************************
 
-BUFFER3D:		DS.B LOGOSIDE*bpl	; bigger to hold zoom
-EMPTY:		DS.B LOGOSIDE*bpl	; clear buffer
+BUFFER3D:		DS.B LOGOSIDE*bwpl	; bigger to hold zoom
+EMPTY:		DS.B LOGOSIDE*bwpl	; clear buffer
 SCREEN1:		DS.B 0		; Define storage for buffer 1
 SCREEN2:		DS.B 0		; two buffers
 
