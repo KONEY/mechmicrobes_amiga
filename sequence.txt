@@ -1,0 +1,80 @@
+Sequence of blocks in OctaMED SS song, by names
+v1.0 - AreXX script by www.KONEY.org 2020
+-----------------------------------------------
+0 2: 32linee
+1 3: Inizio_1
+2 3: Inizio_1
+3 3: Inizio_1
+4 4: Inizio_2
+5 5: inizio+laser
+6 5: inizio+laser
+7 5: inizio+laser
+8 6: inizio+laser_2
+9 7: KuavadoFORA ma....
+10 8: kua taka el kason!
+11 9: Bon...
+12 10: Bon_2
+13 11: kua sbrega
+14 11: kua sbrega
+15 11: kua sbrega
+16 12: KuaSbrega_voice
+17 13: KambioZ
+18 14: Kambioz_2
+19 15: COMPLETO!
+20 15: COMPLETO!
+21 16: Completo_2
+22 17: Cpmpleto_3
+23 15: COMPLETO!
+24 16: Completo_2
+25 18: Ritmiko
+26 19: ritmiko_2
+27 20: Riparte
+28 21: Riparte_2
+29 20: Riparte
+30 22: Riparte_3
+31 23: GrUk!
+32 23: GrUk!
+33 24: gruk_2
+34 25: Gruk_3
+35 26: grukcontinua
+36 27: grukcon_2
+37 26: grukcontinua
+38 27: grukcon_2
+39 28: grukkkkkk
+40 28: grukkkkkk
+41 28: grukkkkkk
+42 29: Grukk_fine
+43 30: KassaSolo
+44 30: KassaSolo
+45 31: Kassasolo_2
+46 32: Reinizia
+47 15: COMPLETO!
+48 15: COMPLETO!
+49 16: Completo_2
+50 17: Cpmpleto_3
+51 20: Riparte
+52 21: Riparte_2
+53 22: Riparte_3
+54 21: Riparte_2
+55 33: Sicontinua
+56 33: Sicontinua
+57 34: Sicontinua+909
+58 35: Riva'
+59 36: Si, va
+60 37: sivacambbio
+61 38: EVA!
+62 38: EVA!
+63 1: Main_2
+64 1: Main_2
+65 0: Main_1
+66 0: Main_1
+67 1: Main_2
+68 1: Main_2
+69 7: KuavadoFORA ma....
+70 8: kua taka el kason!
+71 1: Main_2
+72 1: Main_2
+73 11: kua sbrega
+74 12: KuaSbrega_voice
+75 39: FINE! ffe at 5:48
+-----------------------

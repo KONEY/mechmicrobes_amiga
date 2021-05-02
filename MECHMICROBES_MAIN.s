@@ -8,30 +8,29 @@
 	INCLUDE	"PT12_OPTIONS.i"
 	INCLUDE	"P6112-Play-stripped.i"
 ;********** Constants **********
-wd	EQU	368		; screen width, height, depth
-hg	EQU	230
-bpls	EQU	5		; handy values:
-bwpl	EQU	wd/16*2		; byte-width of 1 bitplane line (46)
-bwid	EQU	bpls*bwpl		; byte-width of 1 pixel line (all bpls)
-TrigShift	EQU	7
-PXLSIDE	EQU	16
-Z_Shift	EQU	PXLSIDE*5/2	; 5x5 obj
-LOGOSIDE	EQU	16*7
-LOGOBPL	EQU	LOGOSIDE/16*2
-MARGINX	EQU	(wd/2)
-MARGINY	EQU	(LOGOSIDE/2)
-TXT_FRMSKIP EQU	3
+wd		EQU 368		; screen width, height, depth
+hg		EQU 230
+bpls		EQU 5		; handy values:
+bwpl		EQU wd/16*2	; byte-width of 1 bitplane line (46)
+bwid		EQU bpls*bwpl	; byte-width of 1 pixel line (all bpls)
+TrigShift		EQU 7
+PXLSIDE		EQU 16
+Z_Shift		EQU PXLSIDE*5/2	; 5x5 obj
+LOGOSIDE		EQU 16*7
+LOGOBPL		EQU LOGOSIDE/16*2
+MARGINX		EQU (wd/2)
+MARGINY		EQU (LOGOSIDE/2)
+TXT_FRMSKIP 	EQU 3
 ;*************
-MODSTART_POS EQU	10	; start music at position # !! MUST BE EVEN FOR 16BIT
+MODSTART_POS 	EQU 1-1		; start music at position # !! MUST BE EVEN FOR 16BIT
 ;*************
 
-VarTimesTrig MACRO ; 3 = 1 * 2, where 2 is cos(Angle)^(TrigShift*2) or sin(Angle)^(TrigShift*2)
+VarTimesTrig 	MACRO ; 3 = 1 * 2, where 2 is cos(Angle)^(TrigShift*2) or sin(Angle)^(TrigShift*2)
 	move.l \1,\3
 	muls \2,\3
-
 	asr.l #TrigShift,\3 ;left >>= TrigShift
 	asr.l #TrigShift,\3
-	ENDM
+		ENDM
 
 ;********** Demo **********	; Demo-specific non-startup code below.
 Demo:				; a4=VBR, a6=Custom Registers Base addr
@@ -60,14 +59,9 @@ Demo:				; a4=VBR, a6=Custom Registers Base addr
 	MOVEQ	#bpls-1,D1
 	BSR.W	PokePtrs
 
-	BSR.W	__NEGATIVE_COLORS
-
-	; #### Point LOGO sprites
-	BSR.W	__POINT_SPRITES
-
 	; #### CPU INTENSIVE TASKS BEFORE STARTING MUSIC
-	; ** POINTS TO COORDS **
-	MOVEQ	#64-1,D1
+	BSR.W	__NEGATIVE_COLORS	; INVERT COLORS IN COP2
+	MOVEQ	#64-1,D1		; ** POINTS TO COORDS **
 	LEA	KONEY_OPT,A2
 	.calcuCoords:
 	MOVE.W	(A2),D0
@@ -75,10 +69,11 @@ Demo:				; a4=VBR, a6=Custom Registers Base addr
 	MULU.W	#Z_Shift,D0	; PRECALCULATED ZSHIFT
 	MOVE.W	D0,(A2)+
 	DBRA	D1,.calcuCoords
-	; ** POINTS TO COORDS **
 	; #### CPU INTENSIVE TASKS BEFORE STARTING MUSIC
 
-	;---  Call P61_Init  ---
+	BSR.W	__POINT_SPRITES	; #### Point sprites
+
+	; ---  Call P61_Init  ---
 	MOVEM.L	D0-A6,-(SP)
 	LEA	MODULE,A0
 	SUB.L	A1,A1
@@ -91,7 +86,7 @@ Demo:				; a4=VBR, a6=Custom Registers Base addr
 	;CLR.W	$100		; DEBUG | w 0 100 2
 ;********************  main loop  ********************
 MainLoop:
-	move.w	#$12c,d0		;No buffering, so wait until raster
+	move.w	#$12c,d0	;No buffering, so wait until raster
 	bsr.w	WaitRaster	;is below the Display Window.
 
 	BSR.W	__SET_PT_VISUALS
@@ -168,6 +163,7 @@ MainLoop:
 	MOVEQ.L	#0,D2
 	.dontResetR:
 	MOVE.W	D2,ANGLE
+	; **** ROTATION VALUES ****
 
 	; **** ZOOM VALUES ****
 	MOVE.W	Z_POS,D4
@@ -255,7 +251,7 @@ MainLoop:
 
 	BSR.W	__BLIT_3D_IN_PLACE
 
-	;ADDI.W	#2,ANGLE		; JUST ROTATE :)
+	;ADDI.W	#2,ANGLE		; JUST ROTATE FOREVER :)
 	;*--- main loop end ---*
 
 	ENDING_CODE:
@@ -278,17 +274,17 @@ PokePtrs:				; Generic, poke ptrs into copper list
 	.bpll:	
 	move.l	a0,d2
 	swap	d2
-	move.w	d2,(a1)		;high word of address
-	move.w	a0,4(a1)		;low word of address
-	addq.w	#8,a1		;skip two copper instructions
-	add.l	d0,a0		;next ptr
+	move.w	d2,(a1)		; high word of address
+	move.w	a0,4(a1)		; low word of address
+	addq.w	#8,a1		; skip two copper instructions
+	add.l	d0,a0		; next ptr
 	dbf	d1,.bpll
 	rts
 ClearScreen:			; a1=screen destination address to clear
 	bsr	WaitBlitter
-	clr.w	BLTDMOD			; destination modulo
-	move.l	#$01000000,BLTCON0		; set operation type in BLTCON0/1
-	move.l	a1,BLTDPTH		; destination address
+	clr.w	BLTDMOD		; destination modulo
+	move.l	#$01000000,BLTCON0	; set operation type in BLTCON0/1
+	move.l	a1,BLTDPTH	; destination address
 	move.l	#hg*bpls*64+bwpl/2,BLTSIZE	;blitter operation size
 	rts
 VBint:				; Blank template VERTB interrupt
@@ -310,18 +306,18 @@ ClearBlitterBuffer:
 	MOVE.W	#wd*64+LOGOSIDE/16,BLTSIZE	; Start Blitter (Blitsize)
 	RTS
 Drawline:
-	LEA	BUFFER3D,A0
+	LEA	BUFFER3D,A0	; ROUTINE STOLEN FROM RAM_JAM
 	ADDI.W	#MARGINX,D0
 	ADD.W	TOP_MARGIN,D1
 	ADDI.W	#MARGINX,D2
 	ADD.W	TOP_MARGIN,D3
 
-	sub.w	d1,d3	; D3=Y2-Y1
-	beq.s	.skip	; per il fill non servono linee orizzontali 
-	bgt.s	.y2gy1	; salta se positivo..
-	exg	d0,d2	; ..altrimenti scambia i punti
-	add.w	d3,d1	; mette in D1 la Y piu` piccola
-	neg.w	d3	; D3=DY
+	sub.w	d1,d3		; D3=Y2-Y1
+	beq.s	.skip		; per il fill non servono linee orizzontali 
+	bgt.s	.y2gy1		; salta se positivo..
+	exg	d0,d2		; ..altrimenti scambia i punti
+	add.w	d3,d1		; mette in D1 la Y piu` piccola
+	neg.w	d3		; D3=DY
 	.y2gy1:
 	mulu.w	#bwpl,d1		; offset Y
 	add.l	d1,a0
@@ -415,12 +411,12 @@ __ROTATE:
 
 __BLIT_3D_IN_PLACE:
 	BSR.W	WaitBlitter
-	MOVE.W	#$FFFF,BLTAFWM		; BLTAFWM lo spiegheremo dopo
-	MOVE.W	#$FFFF,BLTALWM		; BLTALWM lo spiegheremo dopo
-	MOVE.W	#%0000100111110000,BLTCON0	; BLTCON0 (usa A+D)
-	;MOVE.W	#%0000000000001010,BLTCON1	; BLTCON1 lo spiegheremo dopo
-	MOVE.W	#%0000000000010010,BLTCON1	; BLTCON1 lo spiegheremo dopo
-	MOVE.W	#bwpl-LOGOBPL,BLTAMOD	; BLTAMOD =0 perche` il rettangolo
+	MOVE.W	#$FFFF,BLTAFWM		; BLTAFWM
+	MOVE.W	#$FFFF,BLTALWM		; BLTALWM
+	MOVE.W	#%0000100111110000,BLTCON0	; BLTCON0
+	;MOVE.W	#%0000000000001010,BLTCON1	; BLTCON1
+	MOVE.W	#%0000000000010010,BLTCON1	; BLTCON1
+	MOVE.W	#bwpl-LOGOBPL,BLTAMOD	; BLTAMOD
 	MOVE.W	#bwpl-LOGOBPL,BLTDMOD	; Init modulo Dest D
 	MOVE.L	#BUFFER3D,A4
 	ADD.L	#bwpl/2-LOGOBPL/2,A4
@@ -452,7 +448,6 @@ __SET_SEQUENCER_LEDS:
 	LEA	SEQ_POS_BIT,A0
 	MOVE.B	(A0,D0.W),LED_ON\.CTRL
 	MOVE.B	(A0,D0.W),LED_OFF\.CTRL
-	; ## SEQUENCER LEDS ##
 	RTS
 
 __SET_PT_VISUALS:
@@ -466,7 +461,6 @@ __SET_PT_VISUALS:
 	.dontReset:
 	; ## SONG POS RESETS ##
 
-	; ## MOD VISUALIZERS ##########
 	; ## COMMANDS 80x TRIGGERED EVENTS ##
 	MOVE.W	P61_1F,D1		; 1Fx
 	MOVE.W	P61_E8,D2		; 80x
@@ -481,6 +475,7 @@ __SET_PT_VISUALS:
 	CMPI.W	#1,D2		; IF 1F & 80 EQUALS
 	BNE.S	.dontResetAngle
 	MOVE.W	#0,ANGLE		; RESET LOGO
+	MOVE.W	#3,Z_POS		; MAX SIZE
 	MOVE.W	#0,P61_1F		; RESET FX
 	MOVE.W	#0,P61_E8	; RESET FX
 	BRA.S	.skipSubAngle
@@ -501,14 +496,29 @@ __SET_PT_VISUALS:
 	.skipSubAngle:
 	; ## COMMANDS 80x TRIGGERED EVENTS ##
 
+	; ## MOD VISUALIZERS ##########
 	; ## KICK FX - SAMPLE#3 - KICK10.WAV ON CH1
-	LEA	P61_visuctr1(PC),A0 ; which channel? 0-3
+	LEA	P61_visuctr1(PC),A0	; which channel? 0-3
 	MOVEQ	#15,D0		; maxvalue
 	SUB.W	(A0),D0		; -#frames/irqs since instrument trigger
 	BPL.S	.ok1		; below minvalue?
 	MOVEQ	#0,D0		; then set to minvalue
 	.ok1:
-	
+
+	MOVE.W	P61_CH1_INS,D1	; NEW VALUES FROM P61
+	CMPI.W	#3,D1		; SAMPLE # 3
+	BLO.S	.skipKickFx
+	LEA	ZOOM_VALUES,A0
+	MOVE.B	(A0,D0.W),D1
+	MOVE.W	D1,Z_POS
+
+	MOVE.W	TOP_MARGIN,D1	; RELOCATE LOGO
+	CMPI.W	#MARGINY,D1
+	BEQ.S	.skipKickFx
+	ADDI.W	#1,TOP_MARGIN
+	.skipKickFx:
+	; MOD VISUALIZERS *****
+
 	MOVE.W	P61_LAST_POS,D1
 	CMPI.W	#76,D1		; STOP AT END OF MUSIC
 	BNE.S	.dontStopMusic
@@ -517,17 +527,7 @@ __SET_PT_VISUALS:
 	MOVEM.L	(SP)+,D0-A6
 	.dontStopMusic:
 
-	MOVE.W	P61_CH1_INS,D1	; NEW VALUES FROM P61
-	CMPI.W	#3,D1		; BDRUM FROM BLOCK 10
-	BLO.S	.skipZoom
-	MOVE.W	#MARGINY,TOP_MARGIN
-	LEA	ZOOM_VALUES,A0
-	MOVE.B	(A0,D0.W),D1
-	MOVE.W	D1,Z_POS
-	.skipZoom:
-
 	RTS
-	; MOD VISUALIZERS *****
 
 __FILLANDSCROLLTXT:
 	MOVE.W	FRAMESINDEX,D7
@@ -550,7 +550,7 @@ __FILLANDSCROLLTXT:
 	MOVEQ	#0,D6		; RESET D6
 	MOVE.B	#8-1,D6
 	.LOOP:
-	ADD.W	#bwpl-2,A4		; POSITIONING
+	ADD.W	#bwpl-2,A4	; POSITIONING
 	MOVE.B	(A5)+,(A4)+
 	MOVE.B	#%00000000,(A4)+	; WRAPS MORE NICELY?
 	DBRA	D6,.LOOP
@@ -707,8 +707,8 @@ __POINT_COPPERLISTS:
 	MOVE.W	D0,(A0)
 
 	SWAP	D0
-	MOVE.W	#$8000,$DFF02A		; FROM EAB
-	MOVE.L	D0,COP1LC	; COP1LCH
+	MOVE.W	#$8000,$DFF02A	; FROM EAB
+	MOVE.L	D0,COP1LC		; COP1LCH
 	RTS
 
 __STOP_STROBO:
@@ -732,20 +732,19 @@ __START_STROBO:
 __SONG_POS_2_ASCII:
 	; ## TRANSFORM SONGPOS INTO ASCII TXT  ##
 	MOVE.W	P61_LAST_POS,D5
-	ADDQ.W	#1,D5		; DONT SHOW 0 TO USER
+	ADDQ.W	#1,D5	; DONT SHOW 0 TO USER
 	CLR.L	D6
 	MOVE.W	D5,D6
 	DIVU.W	#$A,D6
 	SWAP	D6
 	MOVE.W	D6,D5
 	SWAP	D6
-	OR.B	#48,D6		; POINT TO CHAR 0
+	OR.B	#48,D6	; POINT TO CHAR 0
 	LSL.W	#8,D6
-	OR.B	#48,D5		; POINT TO CHAR 0
+	OR.B	#48,D5	; POINT TO CHAR 0
 	OR.W	D6,D5
 	MOVE.W	D5,TXT_POS
 	RTS
-	; ## TRANSFORM SONGPOS INTO ASCII TXT  ##
 
 ;********** Fastmem Data **********
 	INCLUDE	"sincosin_table.i"	; VALUES
@@ -806,8 +805,6 @@ FONT:		DC.L 0,0			; SPACE CHAR
 		INCBIN "cosmicalien_font.raw",0
 		EVEN
 
-TEXT:		INCLUDE "TEXTSCROLLER.i"
-
 END_TEXT:	DC.B "THANKS FOR EXECUTING MECHMICROBES BY KONEY!",10
 		DC.B "YOU REACHED BLOCK "
 		TXT_POS: DC.B "XX"
@@ -816,10 +813,12 @@ END_TEXT:	DC.B "THANKS FOR EXECUTING MECHMICROBES BY KONEY!",10
 		DC.B "AND HARDCORE AMIGA STUFF!",10
 		EVEN
 
+TEXT:		INCLUDE "textscroller.i"
+
 	SECTION "ChipData",DATA_C	;declared data that must be in chipmem
 
 TR909:		INCBIN "TR-909_368x230x5.raw"
-MODULE:		INCBIN "mechmicrobes.P61"	; code $B000
+MODULE:		INCBIN "mechmicrobes.P61"	; code $100B002
 
 LED_ON:
 	.VPOS:
@@ -853,9 +852,9 @@ LED_OFF:
 COPPER1:		INCLUDE "copperlist_common.i" _COPPER1:
 COPPER2:		INCLUDE "copperlist_common.i" _COPPER2:
 
-;*******************************************************************************
+; *******************************************************************
 	SECTION	ChipBuffers,BSS_C	;BSS doesn't count toward exe size
-;*******************************************************************************
+; *******************************************************************
 
 BUFFER3D:		DS.B LOGOSIDE*bwpl	; bigger to hold zoom
 EMPTY:		DS.B LOGOSIDE*bwpl	; clear buffer
