@@ -32,6 +32,7 @@ VarTimesTrig 	MACRO ; 3 = 1 * 2, where 2 is cos(Angle)^(TrigShift*2) or sin(Angl
 	asr.l #TrigShift,\3
 		ENDM
 
+;CLR.W	$100		; DEBUG | w 0 100 2
 ;********** Demo **********	; Demo-specific non-startup code below.
 Demo:				; a4=VBR, a6=Custom Registers Base addr
 	;*--- init ---*
@@ -83,7 +84,6 @@ Demo:				; a4=VBR, a6=Custom Registers Base addr
 	MOVEM.L (SP)+,D0-A6
 
 	BSR.W	__POINT_COPPERLISTS
-	;CLR.W	$100		; DEBUG | w 0 100 2
 ;********************  main loop  ********************
 MainLoop:
 	move.w	#$12c,d0	;No buffering, so wait until raster
@@ -464,18 +464,20 @@ __SET_PT_VISUALS:
 	; ## COMMANDS 80x TRIGGERED EVENTS ##
 	MOVE.W	P61_1F,D1		; 1Fx
 	MOVE.W	P61_E8,D2		; 80x
+
 	CMPI.W	#$F,D1		; $F STROBO ON
 	BNE.S	.skip1FF
 	BSR.W	__START_STROBO
 	MOVE.W	#0,P61_1F		; RESET FX
 	BRA.S	.skipAddAngle
+
 	.skip1FF:
 	CMPI.W	#1,D1		; IF 1F & 80 EQUALS
 	BNE.S	.dontResetAngle
 	CMPI.W	#1,D2		; IF 1F & 80 EQUALS
 	BNE.S	.dontResetAngle
 	MOVE.W	#0,ANGLE		; RESET LOGO
-	MOVE.W	#3,Z_POS		; MAX SIZE
+	;MOVE.W	#3,Z_POS		; MAX SIZE
 	MOVE.W	#0,P61_1F		; RESET FX
 	MOVE.W	#0,P61_E8	; RESET FX
 	BRA.S	.skipSubAngle
@@ -491,6 +493,7 @@ __SET_PT_VISUALS:
 	MOVE.W	#0,P61_E8	; RESET FX
 	BRA.S	.skipSubAngle
 	.skip80F:
+
 	SUB.W	D2,ANGLE		; WE OPTIMIZE :)
 	SUB.W	D2,ANGLE
 	.skipSubAngle:
