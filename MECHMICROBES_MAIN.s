@@ -61,6 +61,7 @@ Demo:				; a4=VBR, a6=Custom Registers Base addr
 	BSR.W	PokePtrs
 
 	; #### CPU INTENSIVE TASKS BEFORE STARTING MUSIC
+	BSR.W	__DUPLICATE_SCREEN
 	BSR.W	__NEGATIVE_COLORS	; INVERT COLORS IN COP2
 	MOVEQ	#64-1,D1		; ** POINTS TO COORDS **
 	LEA	KONEY_OPT,A2
@@ -112,7 +113,7 @@ MainLoop:
 	move.l	a2,a1
 
 	BSR.W	ClearBlitterBuffer
-	MOVE.L	#TR909,DrawBuffer
+	;MOVE.L	#TR909,DrawBuffer
 	; do stuff here :)
 
 	BSR.W	__FILLANDSCROLLTXT
@@ -422,10 +423,11 @@ __BLIT_3D_IN_PLACE:
 	ADD.L	#bwpl/2-LOGOBPL/2,A4
 	ADD.L	#(LOGOSIDE+16)*40-2,A4	; FOR DESC MODE - WHY THIS VALUES??
 	MOVE.L	A4,BLTAPTH		; BLTAPT  (fisso alla figura sorgente)
-	MOVE.L	BITPLANE_PTR,A4
-	ADD.L	#bwpl/2-LOGOBPL/2,A4
-	ADD.L	#(LOGOSIDE+16)*40-2,A4	; FOR DESC MODE - WHY THIS VALUES??
-	MOVE.L	A4,BLTDPTH
+	MOVEM.l	DrawBuffer(PC),A5
+	ADD.L	#bwpl*hg*4,A5
+	ADD.L	#bwpl/2-LOGOBPL/2,A5
+	ADD.L	#(LOGOSIDE+16)*40-2,A5	; FOR DESC MODE - WHY THIS VALUES??
+	MOVE.L	A5,BLTDPTH
 	MOVE.W	#LOGOSIDE*64+LOGOSIDE/16,BLTSIZE	; Start Blitter (Blitsize)
 	RTS
 
@@ -536,7 +538,7 @@ __FILLANDSCROLLTXT:
 	MOVE.W	FRAMESINDEX,D7
 	CMPI.W	#3,D7
 	BNE.W	.SKIP
-	MOVE.L	BGPLANE0,A4
+	MOVEM.L	ViewBuffer,A4	; Trick for double buffering ;)
 	LEA	FONT,A5
 	LEA	TEXT,A3
 	ADD.W	#bwpl*(hg-19)+1,A4	; POSITIONING
@@ -557,6 +559,7 @@ __FILLANDSCROLLTXT:
 	MOVE.B	(A5)+,(A4)+
 	MOVE.B	#%00000000,(A4)+	; WRAPS MORE NICELY?
 	DBRA	D6,.LOOP
+	ADD.W	#bwpl*2-2,A2	; POSITIONING
 	ADD.W	#bwpl*2-2,A4	; POSITIONING
 	MOVE.B	#%00000000,(A4)	; WRAPS MORE NICELY?
 	.SKIP:
@@ -572,7 +575,9 @@ __FILLANDSCROLLTXT:
 
 	.SHIFTTEXT:
 	BSR.W	WaitBlitter
-	MOVE.L	BGPLANE0,A4
+	MOVEM.L	ViewBuffer,A2	; DOUBLE
+	MOVE.L	DrawBuffer,A4	; BUFFERING ;)
+	ADD.W	#bwpl*(hg-11),A2	; POSITIONING
 	ADD.W	#bwpl*(hg-11),A4	; POSITIONING
 	MOVE.W	#$FFFF,BLTAFWM	; BLTAFWM lo spiegheremo dopo
 	MOVE.W	#$000F,BLTALWM	; BLTALWM lo spiegheremo dopo
@@ -580,7 +585,7 @@ __FILLANDSCROLLTXT:
 	MOVE.W	#%0000000000000010,BLTCON1	; BLTCON1 BIT 12 DESC MODE
 	MOVE.W	#3,BLTAMOD	; BLTAMOD =0 perche` il rettangolo
 	MOVE.W	#3,BLTDMOD	; BLTDMOD 40-4=36 il rettangolo
-	MOVE.L	A4,BLTAPTH	; BLTAPT  (fisso alla figura sorgente)
+	MOVE.L	A2,BLTAPTH	; BLTAPT  (fisso alla figura sorgente)
 	MOVE.L	A4,BLTDPTH
 	MOVE.W	#5*64+(wd-10)/16,BLTSIZE	; BLTSIZE (via al blitter !)
 	RTS
@@ -749,6 +754,21 @@ __SONG_POS_2_ASCII:
 	MOVE.W	D5,TXT_POS
 	RTS
 
+__DUPLICATE_SCREEN:
+	MOVEM.L	D0-A6,-(SP)	; SAVE TO STACK
+	LEA	SCREEN1,A0
+	LEA	SCREEN2,A1
+	MOVE.L	#hg*bpls-1,D1	; LINES
+	.outerLoop:
+	MOVE.L	#wd/16-1,D0	; SIZE OF SOURCE IN WORDS
+	.innerLoop:
+	MOVE.W	(A0)+,(A1)+
+	DBRA	D0,.innerLoop
+	DBRA.W	D1,.outerLoop
+
+	MOVEM.L	(SP)+,D0-A6	; FETCH FROM STACK
+	RTS
+
 ;********** Fastmem Data **********
 	INCLUDE	"sincosin_table.i"	; VALUES
 
@@ -795,12 +815,6 @@ SEQ_POS_ON:	DC.B $00,$51,$5C,$65,$00,$7A,$84,$8E,$00,$A3,$AD,$B8,$00,$CD,$D8,$E2
 SEQ_POS_BIT:	DC.B $1,$1,$0,$1,$0,$0,$1,$1,$0,$0,$1,$0,$1,$0,$1,$1
 SEQ_POS_OFF:	DC.B $47,$00,$00,$00,$70,$00,$00,$00,$99,$00,$00,$00,$C2,$00,$00,$00
 
-BGPLANE0:		DC.L TR909
-BGPLANE1:		DC.L TR909+bwpl*hg
-BGPLANE2:		DC.L TR909+bwpl*hg*2
-BGPLANE3:		DC.L TR909+bwpl*hg*3
-BGPLANE4:	DC.L TR909+bwpl*hg*3
-BITPLANE_PTR:	DC.L TR909+(bwpl*hg*4)	; +(bwpl/2)-(LOGOBPL/2)
 DrawBuffer:	DC.L SCREEN2		; pointers to buffers
 ViewBuffer:	DC.L SCREEN1		; to be swapped
 
@@ -820,7 +834,8 @@ TEXT:		INCLUDE "textscroller.i"
 
 	SECTION "ChipData",DATA_C	;declared data that must be in chipmem
 
-TR909:		INCBIN "TR-909_368x230x5.raw"
+SCREEN1:		INCBIN "TR-909_368x230x5.raw"
+
 MODULE:		INCBIN "mechmicrobes.P61"	; code $100B002
 
 LED_ON:
@@ -861,7 +876,7 @@ COPPER2:		INCLUDE "copperlist_common.i" _COPPER2:
 
 BUFFER3D:		DS.B LOGOSIDE*bwpl	; bigger to hold zoom
 EMPTY:		DS.B LOGOSIDE*bwpl	; clear buffer
-SCREEN1:		DS.B 0		; Define storage for buffer 1
-SCREEN2:		DS.B 0		; two buffers
+;SCREEN1:		DS.B 0		; Define storage for buffer 1
+SCREEN2:		DS.B bwid*hg	; two buffers
 
 END
