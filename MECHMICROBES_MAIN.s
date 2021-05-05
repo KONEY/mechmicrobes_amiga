@@ -640,8 +640,8 @@ __POINT_SPRITES:			; #### Point LOGO sprites
 	RTS
 
 __NEGATIVE_COLORS:
-	LEA.L	COPPER1\.Palette,A2
-	LEA.L	COPPER2\.Palette,A3
+	LEA	COPPER1\.Palette,A2
+	LEA	COPPER2\.Palette,A3
 	.loop:
 	MOVE.L	(A2)+,D1
 	CMP.L	#$FFFFFFFE,D1	; END OF COPPERLIST
