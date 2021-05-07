@@ -232,11 +232,13 @@ MainLoop:
 
 	ENDING_CODE:
 	BTST	#6,$BFE001
-	BNE.S	.DontShowRasterTime
-	MOVE.W	#$0FF,$DFF196	; show rastertime left down to $12c
-	.DontShowRasterTime:
+	BEQ.S	.quit		; then loop
+	;BNE.S	.DontShowRasterTime
+	;MOVE.W	#$0FF,$DFF196	; show rastertime left down to $12c
+	;.DontShowRasterTime:
 	BTST	#2,$DFF016	; POTINP - RMB pressed?
 	BNE.W	MainLoop		; then loop
+	.quit:
 	;*--- exit ---*
 	BSR.W	__SONG_POS_2_ASCII
 	;    ---  Call P61_End  ---
