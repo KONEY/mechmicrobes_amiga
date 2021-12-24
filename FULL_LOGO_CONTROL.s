@@ -3,6 +3,7 @@
 	SECTION	"Code",CODE
 	INCLUDE	"PhotonsMiniWrapper1.04!.S"
 	INCLUDE	"custom-registers.i"	;use if you like ;)
+	INCLUDE	"cli_output.s"
 	INCLUDE	"PT12_OPTIONS.i"
 	INCLUDE	"P6112-Play-stripped.i"
 ;********** Constants **********
@@ -43,10 +44,10 @@ Demo:				;a4=VBR, a6=Custom Registers Base addr
 	BSR.W	ClearScreen
 	BSR	WaitBlitter
 	;*--- start copper ---*
-	LEA	SCREEN1,A0
+	move.l	DrawBuffer,A0
 	MOVEQ	#bpl,D0
 	LEA	BplPtrs+2,A1
-	MOVEQ	#bpls-1,D1
+	MOVEQ	#0,D1
 	BSR.W	PokePtrs
 
 	; #### CPU INTENSIVE TASKS BEFORE STARTING MUSIC
@@ -76,17 +77,17 @@ MainLoop:
 	move.w	#$12c,d0		;No buffering, so wait until raster
 	bsr.w	WaitRaster	;is below the Display Window.
 	;*--- swap buffers ---*
-	movem.l	DrawBuffer(PC),a2-a3
-	exg	a2,a3
-	movem.l	a2-a3,DrawBuffer	;draw into a2, show a3
+	;movem.l	DrawBuffer(PC),a2-a3
+	;exg	a2,a3
+	;movem.l	a2-a3,DrawBuffer	;draw into a2, show a3
 	;*--- show one... ---*
-	move.l	a3,a0
-	move.l	#bpl*h,d0
-	lea	BplPtrs+2,a1
-	moveq	#bpls-1,d1
-	bsr.w	PokePtrs
+	;move.l	a3,a0
+	;move.l	#bpl*h,d0
+	;lea	BplPtrs+2,a1
+	;moveq	#bpls-1,d1
+	;bsr.w	PokePtrs
 	;*--- ...draw into the other(a2) ---*
-	move.l	a2,a1
+	;move.l	DrawBuffer,a1
 	bsr	ClearBuffer2
 	;MOVE.L	BITPLANE_PTR,DrawBuffer
 	;MOVE.L	#TR909,DrawBuffer
@@ -102,11 +103,14 @@ MainLoop:
 	ADD.W	D1,D0
 	BTST	#9,D0		; 9 LEFT
 	BEQ.S	.notLeft
-	SUBI.W	#4,ANGLE
+	SUBI.W	#8,ANGLE
 	.notLeft:
 	BTST	#1,D0		; 1 RIGHT
 	BEQ.S	.notRight
-	ADDI.W	#4,ANGLE
+	TST.W	JOYDIR_STATUS
+	BNE.W	.SkipJoyActions
+	MOVE.W	#1,JOYDIR_STATUS
+	ADDI.L	#2,KONEY_PTR	; MESSES COORDZ
 	.notRight:
 	BTST	#10,D0		; 10 UP
 	BEQ.S	.notDown
@@ -116,12 +120,19 @@ MainLoop:
 	BEQ.S	.notUp
 	ADDI.W	#2,Z_POS
 	.notUp:
+
+	.SkipJoyActions:
+	CMPI.W	#$00000101,D0
+	BNE.S	.DontResetStatus
+	MOVE.W	#0,JOYDIR_STATUS
+	.DontResetStatus:
 	; **** JOYSTICK TEST ****
 
 	;CLR.W	$100		; DEBUG | w 0 100 2
 
 	; **** ROTATION VALUES ****
 	MOVE.W	ANGLE,D2
+	ADDI.W	#6,D2
 	CMPI.W	#0,D2
 	BGE.S	.dontResetL
 	MOVE.W	#358,D2
@@ -150,9 +161,9 @@ MainLoop:
 	MOVE.W	#$FFFF,BLTBDAT	; BLTBDAT = pattern della linea!
 	;MOVE.B	$DFF006,BLTBDAT
 
-	MOVEQ	#16-1,D7
+	MOVEQ	#23,D7
 	MOVE.W	#0,XY_INIT
-	LEA	KONEY_OPT,A2
+	MOVE.L	KONEY_PTR,A2
 
 	.fetchCoordz:
 	MOVEM.L	D7,-(SP)
@@ -211,6 +222,13 @@ MainLoop:
 
 	MOVEM.L	(SP)+,D0-D1
 
+	;LSR.L	#1,D0		; GLITCH
+	ROL.B	#1,D3
+	EXG.L	D0,D3
+	ROL.B	#1,D1		; GLITCH
+	LSL.L	#2,D2		; GLITCH
+	;EXG.L	D1,D2
+
 	BSR.W	Drawline
 
 	MOVEM.L	(SP)+,D7
@@ -254,7 +272,7 @@ VBint:				; Blank template VERTB interrupt
 	move.w	#$20,$DFF09C	; KONEY REFACTOR
 	.notvb:	
 	rte
-ClearBuffer:				; by KONEY
+ClearBuffer:			; by KONEY
 	bsr	WaitBlitter
 	clr.w	BLTDMOD			; destination modulo
 	move.l	#$01000000,BLTCON0		; set operation type in BLTCON0/1
@@ -266,10 +284,10 @@ ClearBuffer2:
 	MOVE.W	#$09f0,BLTCON0		; A**,Shift 0, A -> D
 	MOVE.W	#0,BLTCON1		; Everything Normal
 	MOVE.L	#0,BLTAMOD		; Init modulo Sou. A
-	;MOVE.W	#0,BLTDMOD		; Init modulo Dest D
+	MOVE.W	#0,BLTDMOD		; Init modulo Dest D
 	MOVE.L	#Empty,BLTAPTH		; Source
 	MOVE.L	DrawBuffer,BLTDPTH		; Dest
-	MOVE.W	#(h*64)+(w/16),BLTSIZE	; Start Blitter (Blitsize)
+	MOVE.W	#h*64+w/16,BLTSIZE		; Start Blitter (Blitsize)
 	RTS
 
 ;******************************************************************************
@@ -292,59 +310,59 @@ Drawline:
 
 	; * scelta ottante
 	sub.w	d0,d2		; D2=X2-X1
-	bmi.s	DRAW4		; se negativo salta, altrimenti D2=DiffX
+	bmi.s	.DRAW4		; se negativo salta, altrimenti D2=DiffX
 	sub.w	d1,d3		; D3=Y2-Y1
-	bmi.s	DRAW2		; se negativo salta, altrimenti D3=DiffY
+	bmi.s	.DRAW2		; se negativo salta, altrimenti D3=DiffY
 	cmp.w	d3,d2		; confronta DiffX e DiffY
-	bmi.s	DRAW1		; se D2<D3 salta..
+	bmi.s	.DRAW1		; se D2<D3 salta..
 				; .. altrimenti D3=DY e D2=DX
 	moveq	#$10,d5		; codice ottante
-	bra.s	DRAWL
-DRAW1:
+	bra.s	.DRAWL
+	.DRAW1:
 	exg.l	d2,d3		; scambia D2 e D3, in modo che D3=DY e D2=DX
 	moveq	#0,d5		; codice ottante
-	bra.s	DRAWL
-DRAW2:
+	bra.s	.DRAWL
+	.DRAW2:
 	neg.w	d3		; rende D3 positivo
 	cmp.w	d3,d2		; confronta DiffX e DiffY
-	bmi.s	DRAW3		; se D2<D3 salta..
+	bmi.s	.DRAW3		; se D2<D3 salta..
 				; .. altrimenti D3=DY e D2=DX
 	moveq	#$18,d5		; codice ottante
-	bra.s	DRAWL
-DRAW3:
+	bra.s	.DRAWL
+	.DRAW3:
 	exg.l	d2,d3		; scambia D2 e D3, in modo che D3=DY e D2=DX
 	moveq	#$04,d5		; codice ottante
-	bra.s	DRAWL
-DRAW4:
+	bra.s	.DRAWL
+	.DRAW4:
 	neg.w	d2		; rende D2 positivo
 	sub.w	d1,d3		; D3=Y2-Y1
-	bmi.s	DRAW6		; se negativo salta, altrimenti D3=DiffY
+	bmi.s	.DRAW6		; se negativo salta, altrimenti D3=DiffY
 	cmp.w	d3,d2		; confronta DiffX e DiffY
-	bmi.s	DRAW5		; se D2<D3 salta..
+	bmi.s	.DRAW5		; se D2<D3 salta..
 				; .. altrimenti D3=DY e D2=DX
 	moveq	#$14,d5		; codice ottante
-	bra.s	DRAWL
-DRAW5:
+	bra.s	.DRAWL
+	.DRAW5:
 	exg.l	d2,d3		; scambia D2 e D3, in modo che D3=DY e D2=DX
 	moveq	#$08,d5		; codice ottante
-	bra.s	DRAWL
-DRAW6:
+	bra.s	.DRAWL
+	.DRAW6:
 	neg.w	d3		; rende D3 positivo
 	cmp.w	d3,d2		; confronta DiffX e DiffY
-	bmi.s	DRAW7		; se D2<D3 salta..
+	bmi.s	.DRAW7		; se D2<D3 salta..
 				; .. altrimenti D3=DY e D2=DX
 	moveq	#$1c,d5		; codice ottante
-	bra.s	DRAWL
-DRAW7:
+	bra.s	.DRAWL
+	.DRAW7:
 	exg.l	d2,d3		; scambia D2 e D3, in modo che D3=DY e D2=DX
 	moveq	#$0c,d5		; codice ottante
 
-; Quando l'esecuzione raggiunge questo punto, abbiamo:
-; D2 = DX
-; D3 = DY
-; D5 = codice ottante
+	; Quando l'esecuzione raggiunge questo punto, abbiamo:
+	; D2 = DX
+	; D3 = DY
+	; D5 = codice ottante
 
-DRAWL:
+	.DRAWL:
 	;MOVE.W	D1,D4		; OPTIMIZING mulu.w #40,d1
 	;LSL.W	#5,D1
 	;LSL.W	#3,D4
@@ -353,9 +371,9 @@ DRAWL:
 	add.w	d1,a0		; aggiunge l'offset Y all'indirizzo
 
 	move.w	d0,d1		; copia la coordinata X
-	andi.w	#$000F,d0	; seleziona i 4 bit piu` bassi della X..
+	andi.w	#$000F,d0		; seleziona i 4 bit piu` bassi della X..
 	ror.w	#4,d0		; .. e li sposta nei bit da 12 a 15
-	ori.w	#$0BCA,d0	; con un OR ottengo il valore da scrivere
+	ori.w	#$0BCA,d0		; con un OR ottengo il valore da scrivere
 				; in BLTCON0. Con questo valore di LF ($4A)
 				; si disegnano linee in EOR con lo sfondo.
 				; #$0BCA
@@ -378,7 +396,7 @@ DRAWL:
 	ori.w	#$0001,d5		; setta bit 0 (attiva line-mode)
 	tst.w	d3
 	bpl.s	OK1		; se 4*DY-2*DX>0 salta..
-	ori.w	#$0040,d5	; altrimenti setta il bit SIGN
+	ori.w	#$0040,d5		; altrimenti setta il bit SIGN
 	OK1:
 	move.w	d0,BLTCON0	; BLTCON0
 	move.w	d5,BLTCON1	; BLTCON1
@@ -388,6 +406,89 @@ DRAWL:
 	move.l	a0,BLTDPTH	; BLTDPT - indirizzo schermo
 	move.w	d1,BLTSIZE	; BLTSIZE
 	rts
+
+DrawlineFill:
+	MOVE.L	DrawBuffer,A0	; ROUTINE STOLEN FROM RAM_JAM
+	ADDI.W	#MARGINX,D0
+	ADDI.W	#MARGINY,D1
+	ADDI.W	#MARGINX,D2
+	ADDI.W	#MARGINY,D3
+
+	sub.w	d1,d3		; D3=Y2-Y1
+	beq.s	.skip		; per il fill non servono linee orizzontali 
+	bgt.s	.y2gy1		; salta se positivo..
+	exg	d0,d2		; ..altrimenti scambia i punti
+	add.w	d3,d1		; mette in D1 la Y piu` piccola
+	neg.w	d3		; D3=DY
+	.y2gy1:
+	mulu.w	#bpl,d1		; offset Y
+	add.l	d1,a0
+	moveq	#0,d1		; D1 indice nella tabella ottanti
+	sub.w	d0,d2		; D2=X2-X1
+	bge.s	.xdpos		; salta se positivo..
+	addq.w	#2,d1		; ..altrimenti sposta l'indice
+	neg.w	d2		; e rendi positiva la differenza
+	.xdpos:
+	moveq	#$f,d4		; maschera per i 4 bit bassi
+	and.w	d0,d4		; selezionali in D4
+	
+				; solo se DL_Fill=1
+	move.b	d4,d5		; calcola numero del bit da invertire
+	not.b	d5		; (la BCHG numera i bit in modo inverso	
+
+	lsr.w	#3,d0		; offset X:
+				; Allinea a byte (serve per BCHG)
+	add.w	d0,a0		; aggiunge all'indirizzo
+				; nota che anche se l'indirizzo
+				; e` dispari non fa nulla perche`
+				; il blitter non tiene conto del
+				; bit meno significativo di BLTxPT
+
+	ror.w	#4,d4		; D4 = valore di shift A
+	ori.w	#$0B4A,d4		; aggiunge l'opportuno
+				; Minterm (OR o EOR)
+	swap	d4		; valore di BLTCON0 nella word alta
+		
+	cmp.w	d2,d3		; confronta DiffX e DiffY
+	bge.s	.dygdx		; salta se >=0..
+	addq.w	#1,d1		; altrimenti setta il bit 0 del'indice
+	exg	d2,d3		; e scambia le Diff
+	.dygdx:
+	add.w	d2,d2		; D2 = 2*DiffX
+	move.w	d2,d0		; copia in D0
+	sub.w	d3,d0		; D0 = 2*DiffX-DiffY
+	addx.w	d1,d1		; moltiplica per 2 l'indice e
+				; contemporaneamente aggiunge il flag
+				; X che vale 1 se 2*DiffX-DiffY<0
+				; (settato dalla sub.w)
+	move.b	OKTS(PC,d1.w),d4	; legge l'ottante
+	swap	d2		; valore BLTBMOD in word alta
+	move.w	d0,d2		; word bassa D2=2*DiffX-DiffY
+	sub.w	d3,d2		; word bassa D2=2*DiffX-2*DiffY
+	moveq	#6,d1		; valore di shift e di test per
+				; la wait blitter 
+
+	lsl.w	d1,d3		; calcola il valore di BLTSIZE
+	add.w	#$42,d3
+
+	BSR	WaitBlitter
+
+	bchg	d5,(a0)		; Inverte il primo bit della linea
+
+	move.l	d4,BLTCON0	; BLTCON0/1
+	move.l	d2,BLTBMOD	; BLTBMOD e BLTAMOD
+	move.l	a0,BLTCPTH	; BLTCPT
+	move.w	d0,BLTAPTL	; BLTAPTL
+	move.l	a0,BLTDPTH	; BLTDPT - indirizzo schermo
+	move.w	d3,BLTSIZE	; BLTSIZE
+	.skip:
+	rts
+
+	OKTS:
+	DC.B 3,3+$40
+	DC.B 19,19+$40
+	DC.B 11,11+$40
+	DC.B 23,23+$40
 
 ;******************************************************************************
 ; Questa routine setta i registri del blitter che non devono essere
@@ -421,61 +522,95 @@ __ROTATE:
 ;********** Fastmem Data **********
 	INCLUDE	"sincosin_table.i"	; VALUES
 
+TOP_MARGIN:	DC.W MARGINY-16
 ANGLE:		DC.W 0
-Z_POS:		DC.W 0
+Z_POS:		DC.W 32
 Z_FACT:		DC.W Z_Shift
 CENTER:		DC.W Z_Shift
 X_TEMP:		DC.W 0
 Y_TEMP:		DC.W 0
 XY_INIT:		DC.W 0
+END_TEXT_LEN:	DC.W 152
+JOYDIR_STATUS:	DC.W 0
 
-KONEY:	; ROTATED 90 DEG
-	DC.W 0,0,1,0
-	DC.W 1,0,1,1
-	DC.W 1,1,2,1
-	DC.W 2,1,2,2
-	DC.W 2,2,3,2
-	DC.W 3,2,3,1
-	DC.W 3,1,4,1
-	DC.W 4,1,4,0
-	DC.W 4,0,5,0
-	DC.W 5,0,5,1
-	DC.W 5,1,4,1
-	DC.W 4,1,4,2
-	DC.W 4,2,3,2
-	DC.W 3,2,3,3
-	DC.W 3,3,5,3
-	DC.W 5,3,5,5
-	DC.W 5,5,0,5
-	DC.W 0,5,0,4
-	DC.W 0,4,2,4
-	DC.W 2,4,2,2
-	DC.W 2,2,1,2
-	DC.W 1,2,1,1
-	DC.W 1,1,0,1
-	DC.W 0,1,0,0
+END_TEXT:		DC.B "THANKS FOR EXECUTING MECHMICROBES BY KONEY!",10
+		DC.B "YOU REACHED BLOCK "
+		TXT_POS: DC.B "XX"
+		DC.B " FROM A SEQUENCE OF 76. ",10
+		DC.B "VISIT WWW.KONEY.ORG FOR MORE TECHNO "
+		DC.B "AND HARDCORE AMIGA STUFF!",10
+		EVEN
 
-KONEY_OPT:	; OPTIMIZED
-	DC.W 0,0,1,0
-	DC.W 1,0,1,2
-	DC.W 1,2,4,2
-	DC.W 4,2,4,0
-	DC.W 4,0,5,0
-	DC.W 5,0,5,1
-	DC.W 5,1,3,1
-	DC.W 3,1,3,4
-	DC.W 3,4,5,4
-	DC.W 5,4,5,5
-	DC.W 5,5,4,5
-	DC.W 4,5,4,3
-	DC.W 4,3,2,3
-	DC.W 2,3,2,5
-	DC.W 2,5,0,5
-	DC.W 0,5,0,0
+KONEY:			; ROTATED 90 DEG
+		DC.W 0,0,1,0
+		DC.W 1,0,1,1
+		DC.W 1,1,2,1
+		DC.W 2,1,2,2
+		DC.W 2,2,3,2
+		DC.W 3,2,3,1
+		DC.W 3,1,4,1
+		DC.W 4,1,4,0
+		DC.W 4,0,5,0
+		DC.W 5,0,5,1
+		DC.W 5,1,4,1
+		DC.W 4,1,4,2
+		DC.W 4,2,3,2
+		DC.W 3,2,3,3
+		DC.W 3,3,5,3
+		DC.W 5,3,5,5
+		DC.W 5,5,0,5
+		DC.W 0,5,0,4
+		DC.W 0,4,2,4
+		DC.W 2,4,2,2
+		DC.W 2,2,1,2
+		DC.W 1,2,1,1
+		DC.W 1,1,0,1
+		DC.W 0,1,0,0
+
+KONEY_PTR:	DC.L KONEY_OPT
+KONEY_OPT:		; OPTIMIZED
+		DC.W 0,0,0,5
+		DC.W 0,5,5,5
+		DC.W 5,5,4,0
+		DC.W 4,0,0,1
+		DC.W 0,1,1,4
+		DC.W 1,4,4,4
+		DC.W 4,4,4,2
+		DC.W 4,2,2,2
+		DC.W 2,2,2,3
+		DC.W 2,3,3,3
+		DC.W 3,3,3,2
+		DC.W 3,5,4,1
+		DC.W 4,1,5,0
+		DC.W 5,0,5,1
+		DC.W 5,1,1,1
+		DC.W 1,1,1,2
+		DC.W 1,2,5,2
+		DC.W 5,2,5,3
+		DC.W 5,3,1,3
+		DC.W 1,3,5,4
+		DC.W 5,1,5,2
+		DC.W 5,3,2,5
+		DC.W 5,5,1,5
+		DC.W 1,5,3,0
+
+		DC.W 2,0,5,3
+		DC.W 5,3,4,1
+		DC.W 4,1,3,4
+		DC.W 3,4,3,0
+		DC.W 2,4,2,2
+		DC.W 1,1,2,1
+		DC.W 4,1,4,0
+		DC.W 5,5,0,5
+		DC.W 0,5,2,1
+		DC.W 3,1,4,1
+		DC.W 2,1,2,2
+		DC.W 1,0,0,3
+
 
 BITPLANE_PTR:	DC.L BITPLANE	; bitplane azzerato lowres
-DrawBuffer:	DC.L SCREEN2	; pointers to buffers
-ViewBuffer:	DC.L SCREEN1	; to be swapped
+DrawBuffer:	DC.L SCREEN1	; pointers to buffers
+ViewBuffer:	DC.L BITPLANE	; to be swapped
 
 	SECTION	ChipData,DATA_C	;declared data that must be in chipmem
 

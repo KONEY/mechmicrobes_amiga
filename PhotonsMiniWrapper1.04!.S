@@ -57,7 +57,7 @@ Start:
 	jsr -222(a6)		;restore OS screen
 
 ;*--- close lib+exit ---*
-	BSR.W type_end_txt	; TYPE SOMETHING ON EXIT by KONEY
+	;BSR.W type_end_txt	; TYPE SOMETHING ON EXIT by KONEY
 	move.l a6,a1		;close graphics library
 	move.l 4.w,a6
 	jsr -414(a6)
